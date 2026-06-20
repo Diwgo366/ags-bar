@@ -11,8 +11,8 @@ const OPTION_KEYS = [
 ]
 
 function hyprColorToCSS(color) {
-  if (!color?.custom) return null
-  const hex = color.custom.split(" ")[0]
+  if (!color?.gradient) return null
+  const hex = color.gradient.split(" ")[0]
   return `#${hex.slice(2)}`
 }
 
@@ -34,7 +34,7 @@ export async function getHyprOptions() {
 
 function parseGaps(val) {
   if (val?.int) return val.int
-  if (val?.custom) return parseInt(val.custom.split(" ")[0]) || 0
+  if (val?.css) return parseInt(val.css.split(" ")[0]) || 0
   return 10
 }
 
@@ -86,6 +86,7 @@ window {
 }
 
 label {
+  font-family: "CaskaydiaMono Nerd Font", monospace;
   color: @ac-txt;
   font-size: 15px;
   font-weight: bold;
@@ -176,6 +177,29 @@ popover button:hover,
 popover button:checked {
   border-color: @ac-bd;
   background-color: @accent;
+}
+
+.overlay-outer {
+  margin-bottom: 80px;
+}
+
+.overlay-content {
+  min-width: 200px;
+  padding: 8px 10px;
+  background-color: alpha(@bg, 0.95);
+  border-radius: 12px;
+}
+
+.overlay-icon {
+  -gtk-icon-style: regular;
+  color: @ac-txt;
+}
+
+.overlay-label {
+  font-family: "CaskaydiaMono Nerd Font", monospace;
+  font-size: 18px;
+  font-weight: bold;
+  color: @ac-txt;
 }
 
 `

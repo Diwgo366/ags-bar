@@ -4,6 +4,7 @@ import Left from "./bar/Left.js"
 import Center from "./bar/Center.js"
 import Right from "./bar/Right.js"
 import { getHyprOptions, generateCSS, watchConfig } from "./hyprconfig.js"
+import { getOverlay } from "./widgets/Overlay.js"
 
 app.start({
   main() {
@@ -12,6 +13,8 @@ app.start({
     const display = Gdk.Display.get_default()
 
     let provider = null
+
+    const overlay = getOverlay()
 
     async function refreshCSS() {
       try {
@@ -35,7 +38,7 @@ app.start({
     refreshCSS()
     watchConfig(refreshCSS)
 
-    return (
+    return [
       <window
         name="bar"
         visible
@@ -54,7 +57,8 @@ app.start({
             <Right />
           </box>
         </centerbox>
-      </window>
-    )
+      </window>,
+      overlay.window,
+    ]
   },
 })

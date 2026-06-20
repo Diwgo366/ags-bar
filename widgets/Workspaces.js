@@ -5,14 +5,25 @@ import { Gdk, Gtk } from "ags/gtk4"
 
 const hyprland = Hyprland.get_default()
 
+function tryIcon(iconTheme, name) {
+  if (iconTheme.has_icon(name)) return name
+  return null
+}
+
 function getIconName(clientClass) {
   if (!clientClass) return null
   const display = Gdk.Display.get_default()
   const iconTheme = Gtk.IconTheme.get_for_display(display)
   const lower = clientClass.toLowerCase()
-  if (iconTheme.has_icon(lower)) return lower
-  if (iconTheme.has_icon(`application-${lower}`)) return `application-${lower}`
-  return "application-x-executable"
+  const dashed = lower.replace(/\s+/g, "-")
+
+  return (
+    tryIcon(iconTheme, lower) ??
+    tryIcon(iconTheme, dashed) ??
+    tryIcon(iconTheme, `application-${lower}`) ??
+    tryIcon(iconTheme, `application-${dashed}`) ??
+    "application-x-executable"
+  )
 }
 
 function WorkspaceSlot({ id }) {
@@ -41,7 +52,7 @@ function WorkspaceSlot({ id }) {
           if (id === 10)
             execAsync("bash -c '~/.config/hypr/scripts/workspace10.sh'")
           else
-            hyprland.dispatch("workspace", String(id))
+            execAsync(["bash", "-c", `hyprctl dispatch 'hl.dsp.focus({ workspace = ${id} })'`])
         })
         self.add_controller(click)
       }}

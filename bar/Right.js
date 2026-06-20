@@ -8,8 +8,6 @@ import PowerMenu from "../widgets/PowerMenu.js"
 
 export default () => (
   <box class="right">
-    <Tasks />
-    <box class="separator" />
     <Cpu />
     <box class="separator" />
     <Memory />
