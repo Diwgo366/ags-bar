@@ -3,42 +3,19 @@ import { Astal, Gtk, Gdk } from "ags/gtk4"
 import Left from "./bar/Left.js"
 import Center from "./bar/Center.js"
 import Right from "./bar/Right.js"
-import { getHyprOptions, generateCSS, watchConfig } from "./hyprconfig.js"
+import { applyTheme, watchTheme } from "./themeEngine.js"
 import { getOverlay } from "./widgets/Overlay.js"
 import { getCalendarPopup } from "./widgets/CalendarPopup.js"
 
 app.start({
-  main() {
+  main: async () => {
     const { TOP, LEFT, RIGHT } = Astal.WindowAnchor
-
-    const display = Gdk.Display.get_default()
-
-    let provider = null
 
     const overlay = getOverlay()
     const calendarPopup = getCalendarPopup()
 
-    async function refreshCSS() {
-      try {
-        const opts = await getHyprOptions()
-        const css = generateCSS(opts)
-
-        if (provider)
-          Gtk.StyleContext.remove_provider_for_display(display, provider)
-
-        provider = new Gtk.CssProvider()
-        provider.load_from_string(css)
-        Gtk.StyleContext.add_provider_for_display(
-          display, provider,
-          Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION,
-        )
-      } catch (e) {
-        logError(e)
-      }
-    }
-
-    refreshCSS()
-    watchConfig(refreshCSS)
+    await applyTheme()
+    watchTheme()
 
     return [
       <window
