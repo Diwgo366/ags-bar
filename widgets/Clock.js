@@ -1,5 +1,6 @@
 import { createPoll } from "ags/time"
 import { LOCALE, TIME_FORMAT, DATE_FORMAT, INTERVAL } from "../config.js"
+import { getCalendarPopup } from "./CalendarPopup.js"
 
 export default () => {
   const time = createPoll("", INTERVAL.CLOCK, () =>
@@ -10,11 +11,15 @@ export default () => {
     new Date().toLocaleDateString(LOCALE, DATE_FORMAT),
   )
 
+  const calendar = getCalendarPopup()
+
   return (
-    <box class="clock-container">
-      <label class="clock-time" label={time} />
-      <box class="separator" />
-      <label class="clock-date" label={date} />
-    </box>
+    <button class="clock-button" onClicked={() => calendar.toggle()}>
+      <box class="clock-container">
+        <label class="clock-time" label={time} />
+        <box class="separator" />
+        <label class="clock-date" label={date} />
+      </box>
+    </button>
   )
 }

@@ -202,6 +202,66 @@ popover button:checked {
   color: @ac-txt;
 }
 
+.cal-popup {
+  background-color: @bg;
+  border-radius: 12px;
+  border: 2px solid @ic-bd;
+  padding: 12px;
+}
+.cal-header {
+  color: @ac-txt;
+  font-size: 15px;
+  font-weight: bold;
+}
+.cal-day-header {
+  color: @ac-txt;
+  font-size: 11px;
+  font-weight: bold;
+}
+.cal-day-header.today {
+  color: @green;
+}
+.cal-hour-label {
+  color: @ic-txt;
+  font-size: 10px;
+}
+.cal-cell {
+  background-color: alpha(@ic-txt, 0.1);
+  border-bottom: 1px solid alpha(@ic-txt, 0.2);
+  border-right: 1px solid alpha(@ic-txt, 0.2);
+  padding: 2px;
+}
+.cal-event {
+  border-radius: 4px;
+  border-left: 3px solid;
+  padding: 3px 5px;
+}
+.cal-event-time {
+  color: @ac-txt;
+  font-size: 9px;
+  font-weight: bold;
+}
+.cal-event-title {
+  color: @ac-txt;
+  font-size: 9px;
+}
+.cal-event-salon {
+  color: @ac-txt;
+  font-size: 8px;
+  opacity: 0.9;
+}
+.cal-close {
+  background: transparent;
+  border: none;
+  color: @ic-txt;
+  font-size: 18px;
+  min-width: 24px;
+  min-height: 24px;
+}
+.cal-close:hover {
+  color: @red;
+}
+
 `
 }
 

@@ -1,30 +1,10 @@
 import Hyprland from "gi://AstalHyprland"
 import { createBinding, createComputed, createConnection } from "ags"
 import { execAsync } from "ags/process"
-import { Gdk, Gtk } from "ags/gtk4"
+import { Gtk } from "ags/gtk4"
+import { getIconName } from "../utils/iconResolver.js"
 
 const hyprland = Hyprland.get_default()
-
-function tryIcon(iconTheme, name) {
-  if (iconTheme.has_icon(name)) return name
-  return null
-}
-
-function getIconName(clientClass) {
-  if (!clientClass) return null
-  const display = Gdk.Display.get_default()
-  const iconTheme = Gtk.IconTheme.get_for_display(display)
-  const lower = clientClass.toLowerCase()
-  const dashed = lower.replace(/\s+/g, "-")
-
-  return (
-    tryIcon(iconTheme, lower) ??
-    tryIcon(iconTheme, dashed) ??
-    tryIcon(iconTheme, `application-${lower}`) ??
-    tryIcon(iconTheme, `application-${dashed}`) ??
-    "application-x-executable"
-  )
-}
 
 function WorkspaceSlot({ id }) {
   const allClients = createBinding(hyprland, "clients")
@@ -50,7 +30,7 @@ function WorkspaceSlot({ id }) {
         const click = Gtk.GestureClick.new()
         click.connect("pressed", () => {
           if (id === 10)
-            execAsync("bash -c '~/.config/hypr/scripts/workspace10.sh'")
+            execAsync(["bash", "-c", "~/.config/hypr/scripts/workspace10.sh"])
           else
             execAsync(["bash", "-c", `hyprctl dispatch 'hl.dsp.focus({ workspace = ${id} })'`])
         })

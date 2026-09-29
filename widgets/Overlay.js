@@ -3,10 +3,44 @@ import Gio from "gi://Gio"
 import GLib from "gi://GLib"
 import app from "ags/gtk4/app"
 
+// ── Constants ──────────────────────────────────────────────
 const FADE_DURATION = 150
 const HIDE_DELAY = 2000
-const LED_POLL = 200
+const LED_POLL_INTERVAL = 200
 
+// ── Display config per type (icon, label, optional cssClass) ─
+const DISPLAY = {
+  volume: {
+    icon: (v) => v <= 0 ? "audio-volume-muted-symbolic" :
+            v < 33 ? "audio-volume-low-symbolic" :
+            v < 66 ? "audio-volume-medium-symbolic" :
+            "audio-volume-high-symbolic",
+    label: (v) => `${v}%`,
+  },
+  brightness: {
+    icon: (v) => v < 33 ? "display-brightness-low-symbolic" :
+            v < 66 ? "display-brightness-medium-symbolic" :
+            "display-brightness-high-symbolic",
+    label: (v) => `${v}%`,
+  },
+  capslock: {
+    icon: (v) => v === "true" ? "capslock-on" : "capslock-off",
+    label: (v) => v === "true" ? "Bloq Mayús: ON" : "Bloq Mayús: OFF",
+    cssClass: (v) => v === "true" ? "overlay-on" : "overlay-off",
+  },
+  numlock: {
+    icon: (v) => v === "true" ? "numlock-on" : "numlock-off",
+    label: (v) => v === "true" ? "Bloq Num: ON" : "Bloq Num: OFF",
+    cssClass: (v) => v === "true" ? "overlay-on" : "overlay-off",
+  },
+  mute: {
+    icon: (v) => v === "true" ? "audio-volume-muted-symbolic" : "audio-volume-high-symbolic",
+    label: (v) => v === "true" ? "Muteado" : "Activado",
+    cssClass: (v) => v === "true" ? "overlay-off" : "overlay-on",
+  },
+}
+
+// ── LED helpers ────────────────────────────────────────────
 function findLEDPath(type) {
   try {
     const dir = Gio.File.new_for_path("/sys/class/leds")
@@ -29,26 +63,35 @@ function readLED(path) {
   return new TextDecoder().decode(buf).trim()
 }
 
-function createOverlayWindow() {
-  const provider = new Gtk.CssProvider()
-  provider.load_from_string(`
+// ─── CSS provider (once) ──────────────────────────────────
+let _cssReady = false
+function ensureOverlayCSS() {
+  if (_cssReady) return
+  _cssReady = true
+  const p = new Gtk.CssProvider()
+  p.load_from_string(`
     .overlay-icon.overlay-on, .overlay-label.overlay-on { color: #50fa7b; }
     .overlay-icon.overlay-off, .overlay-label.overlay-off { color: #7a7a7a; }
   `)
   Gtk.StyleContext.add_provider_for_display(
-    Gdk.Display.get_default(), provider,
+    Gdk.Display.get_default(), p,
     Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION,
   )
+}
+
+// ─── Overlay window creation ──────────────────────────────
+function createOverlayWindow() {
+  ensureOverlayCSS()
 
   let hideTimeout = null
   let animSource = null
 
+  // ── Animation ──
   function animateOpacity(widget, target, duration, cb) {
     if (animSource !== null) {
       GLib.Source.remove(animSource)
       animSource = null
     }
-
     const start = widget.get_opacity()
     const diff = target - start
     const startTime = GLib.get_monotonic_time()
@@ -66,10 +109,9 @@ function createOverlayWindow() {
     })
   }
 
+  // ── UI ──
   const iconImage = new Gtk.Image({
-    icon_name: "",
-    pixel_size: 32,
-    icon_size: Gtk.IconSize.LARGE,
+    icon_name: "", pixel_size: 32, icon_size: Gtk.IconSize.LARGE,
   })
   iconImage.add_css_class("overlay-icon")
 
@@ -82,8 +124,7 @@ function createOverlayWindow() {
   centerBox.set_end_widget(new Gtk.Box())
 
   const contentBox = new Gtk.Box({
-    orientation: Gtk.Orientation.VERTICAL,
-    spacing: 8,
+    orientation: Gtk.Orientation.VERTICAL, spacing: 8,
     halign: Gtk.Align.CENTER,
   })
   contentBox.append(centerBox)
@@ -105,62 +146,26 @@ function createOverlayWindow() {
     child: outerBox,
   })
 
+  // ── Show / update ──
   function show(type, value) {
-    let iconName = ""
-    let labelText = ""
+    const cfg = DISPLAY[type]
+    if (!cfg) return
 
-    switch (type) {
-      case "volume": {
-        const v = parseInt(value, 10)
-        iconName = v <= 0 ? "audio-volume-muted-symbolic" :
-                    v < 33 ? "audio-volume-low-symbolic" :
-                    v < 66 ? "audio-volume-medium-symbolic" :
-                    "audio-volume-high-symbolic"
-        labelText = `${v}%`
-        break
-      }
-      case "brightness": {
-        const v = parseInt(value, 10)
-        iconName = v < 33 ? "display-brightness-low-symbolic" :
-                    v < 66 ? "display-brightness-medium-symbolic" :
-                    "display-brightness-high-symbolic"
-        labelText = `${v}%`
-        break
-      }
-      case "capslock":
-        iconName = value === "true" ? "capslock-on" : "capslock-off"
-        labelText = value === "true" ? "Bloq Mayús: ON" : "Bloq Mayús: OFF"
-        break
-      case "numlock":
-        iconName = value === "true" ? "numlock-on" : "numlock-off"
-        labelText = value === "true" ? "Bloq Num: ON" : "Bloq Num: OFF"
-        break
-      case "mute":
-        iconName = value === "true" ? "audio-volume-muted-symbolic" : "audio-volume-high-symbolic"
-        labelText = value === "true" ? "Muteado" : "Activado"
-        break
-    }
-
-    iconImage.set_from_icon_name(iconName)
-    label.set_label(labelText)
+    iconImage.set_from_icon_name(cfg.icon(value))
+    label.set_label(cfg.label(value))
 
     iconImage.remove_css_class("overlay-on")
     iconImage.remove_css_class("overlay-off")
     label.remove_css_class("overlay-on")
     label.remove_css_class("overlay-off")
 
-    if (type === "capslock" || type === "numlock") {
-      const klass = value === "true" ? "overlay-on" : "overlay-off"
-      iconImage.add_css_class(klass)
-      label.add_css_class(klass)
-    } else if (type === "mute") {
-      const klass = value === "true" ? "overlay-off" : "overlay-on"
+    if (cfg.cssClass) {
+      const klass = cfg.cssClass(value)
       iconImage.add_css_class(klass)
       label.add_css_class(klass)
     }
 
-    if (hideTimeout)
-      clearTimeout(hideTimeout)
+    if (hideTimeout) clearTimeout(hideTimeout)
 
     window.visible = true
     animateOpacity(window, 1, FADE_DURATION)
@@ -171,6 +176,7 @@ function createOverlayWindow() {
     }, HIDE_DELAY)
   }
 
+  // ── D-Bus subscription ──
   const bus = Gio.bus_get_sync(Gio.BusType.SESSION, null)
   bus.signal_subscribe(
     null, "com.ags.Overlay", "Show", "/com/ags/Overlay",
@@ -181,13 +187,14 @@ function createOverlayWindow() {
     },
   )
 
+  // ── LED polling ──
   const leds = [
     { type: "capslock", path: findLEDPath("capslock"), prev: null },
     { type: "numlock", path: findLEDPath("numlock"), prev: null },
   ]
 
   if (leds.some(l => l.path)) {
-    GLib.timeout_add(GLib.PRIORITY_DEFAULT, LED_POLL, () => {
+    GLib.timeout_add(GLib.PRIORITY_DEFAULT, LED_POLL_INTERVAL, () => {
       for (const led of leds) {
         if (!led.path) continue
         const value = readLED(led.path)
@@ -203,6 +210,7 @@ function createOverlayWindow() {
   return { window, show }
 }
 
+// ── Singleton ──────────────────────────────────────────────
 let overlayInstance = null
 
 export function getOverlay() {

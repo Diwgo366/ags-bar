@@ -5,6 +5,7 @@ import Center from "./bar/Center.js"
 import Right from "./bar/Right.js"
 import { getHyprOptions, generateCSS, watchConfig } from "./hyprconfig.js"
 import { getOverlay } from "./widgets/Overlay.js"
+import { getCalendarPopup } from "./widgets/CalendarPopup.js"
 
 app.start({
   main() {
@@ -15,6 +16,7 @@ app.start({
     let provider = null
 
     const overlay = getOverlay()
+    const calendarPopup = getCalendarPopup()
 
     async function refreshCSS() {
       try {
@@ -59,6 +61,7 @@ app.start({
         </centerbox>
       </window>,
       overlay.window,
+      calendarPopup.window,
     ]
   },
 })

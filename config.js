@@ -39,4 +39,19 @@ export const INTERVAL = {
 
   // Tareas pendientes de Brave Tasks (cada 10 segundos)
   TASKS: 10000,
+
+  // Calendario Google Calendar via iCal (cada 5 minutos)
+  CALENDAR: 300000,
+}
+
+// URL iCal secreta de Google Calendar
+// Para obtenerla: Calendar > 3 puntos > Configuración > Dirección secreta en formato iCal
+export const ICAL_URL = "https://calendar.google.com/calendar/ical/diegoamirch%40gmail.com/private-5cd69151e6f5daf1b220b2b1f2320c55/basic.ics"
+
+// Configuración del calendario semanal (popup)
+export const CALENDAR = {
+  START_HOUR: 8,
+  END_HOUR: 21,
+  HOUR_HEIGHT: 40,
+  NUM_DAYS: 7,
 }
