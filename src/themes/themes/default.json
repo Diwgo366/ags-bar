@@ -1,0 +1,29 @@
+{
+  "name": "default",
+  "icons": "Papirus",
+  "colors": {
+    "bg": "#282a36",
+    "bgAlt": "#191a21",
+    "fg": "#f8f8f2",
+    "fgAlt": "#a0a0b0",
+    "accent": "#9B6BDF",
+    "bd": "#555560",
+    "bdAlt": "#f8f8f2",
+    "red": "#E64747",
+    "green": "#42E66C",
+    "yellow": "#E4F34A",
+    "blue": "#9B6BDF",
+    "magenta": "#E356A7",
+    "cyan": "#75D7EC",
+    "red_s": "#FF5555",
+    "green_s": "#50FA7B",
+    "yellow_s": "#F1FA8C",
+    "blue_s": "#BD93F9",
+    "magenta_s": "#ff79c6",
+    "cyan_s": "#8BE9FD"
+  },
+  "font": {
+    "family": "CaskaydiaMono Nerd Font",
+    "size": 13
+  }
+}

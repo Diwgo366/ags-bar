@@ -1,26 +1,40 @@
-# Git ignore file for AGS Hyprland Bar Project
-# This file contains patterns for files that should not be committed to the repository
-
-# Ignore project-info.md file that contains project documentation for AI agents
+# Archivos de soporte local
 project-info.md
 
-# Ignore temporary files and directories
+# Dependencias y tipos generados por AGS
+node_modules/
+@girs/
+
+# Archivos generados por la aplicación
+src/themes/base.js
+src/themes/current-theme.json
+src/themes/theme.json
+src/config/privateConfig.js
+src/themes/themes/*.json
+!src/themes/themes/default.json
+
+# Scripts locales para adaptar aplicaciones externas a cada tema.
+# Se ignora el contenido, pero se conserva la carpeta con su .gitkeep.
+src/services/theme_scripts/*
+
+# Temporales, cachés y logs
 tmp/
 *.tmp
-*.log
 *.cache
+*.log
 
-# Ignore node_modules and build directories (if any)
-node_modules/
-.DS_Store
-Thumbs.db
+# Variables de entorno y secretos locales
+.env
+.env.*
+!.env.example
 
-# Ignore IDE specific files
-.vscode/
+# Configuración del editor
+.vscode/*
+!.vscode/settings.json
 .idea/
 *.swp
 *.swo
 
-# Ignore OS specific files
-Thumbs.db
+# Archivos del sistema
 .DS_Store
+Thumbs.db
