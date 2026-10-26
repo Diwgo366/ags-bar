@@ -2,7 +2,7 @@ import app from "ags/gtk4/app"
 import { Astal, Gdk } from "ags/gtk4"
 import Bar from "./bar/Bar.tsx"
 import Overlay from "./widgets/Overlay.tsx"
-import CalendarPopup from "./widgets/CalendarPopup.tsx"
+import { configureCalendarPopup } from "./widgets/CalendarPopup.tsx"
 import ThemeSelector from "./widgets/ThemeSelector.tsx"
 import { execAsync } from "ags/process"
 import GLib from "gi://GLib"
@@ -59,19 +59,18 @@ app.start({
     const windows = primaryMonitor ? [Bar(primaryMonitor)] : []
 
     const overlay = Overlay()
-    const calendarPopup = CalendarPopup(privateConfig.calendarUrl)
+    configureCalendarPopup(privateConfig.calendarUrl)
     void watchConfigFiles().catch((error) =>
       console.error("No se pudo iniciar el vigilante de configuración:", error),
     )
     onConfigChange((name, value) => {
-      if (name === "privateConfig") calendarPopup.setCalendarUrl(value.calendarUrl)
+      if (name === "privateConfig") configureCalendarPopup(value.calendarUrl)
     })
     const themeSelector = ThemeSelector()
 
     return [
       ...windows,
       overlay.window,
-      calendarPopup.window,
       themeSelector.window,
     ]
   },

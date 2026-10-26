@@ -20,9 +20,10 @@ export default () => {
   const calendar = getCalendarPopup()
 
   return (
-    <box
+    <overlay
       class="bar-button"
       $={(self) => {
+        calendar.setAnchor(self)
         const click = Gtk.GestureClick.new()
         click.connect("pressed", () => calendar.toggle())
         self.add_controller(click)
@@ -33,6 +34,6 @@ export default () => {
         <box class="separator" />
         <label class="large-label" label={date} />
       </box>
-    </box>
+    </overlay>
   )
 }

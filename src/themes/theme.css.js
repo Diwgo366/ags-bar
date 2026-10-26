@@ -170,6 +170,7 @@ popover button:hover, popover button:checked { border-color: @accent; background
 }
 
 .cal-popup { background-color: ${c.bg}; border-radius: 12px; border: 2px solid @bd; padding: 12px; }
+.calendar-popover, .calendar-popover > contents { background: transparent; border: 0; box-shadow: none; padding: 0; }
 .cal-header { color: @fg; font-weight: bold; font-size: 15px; }
 .cal-day-header { color: @fg-alt; font-size: 11px; font-weight: bold; }
 .cal-day-header.today { color: @accent; }
@@ -178,8 +179,6 @@ popover button:hover, popover button:checked { border-color: @accent; background
 .cal-cell { background-color: alpha(${c.bd}, 0.1); border-bottom: 1px solid alpha(${c.bd}, 0.2); border-right: 1px solid alpha(${c.bd}, 0.2); padding: 0; }
 .cal-event { border-radius: 4px; border-left: 0; padding: 0 5px; }
 .cal-event-time, .cal-event-title, .cal-event-salon { color: @fg; }
-.cal-close { background: transparent; border: none; color: @fg-alt; font-size: 18px; min-width: 24px; min-height: 24px; }
-.cal-close:hover { color: @red; }
 .cal-week-nav { background: transparent; border: 0; color: @accent; font-size: 24px; min-width: 28px; min-height: 28px; }
 .cal-week-nav:hover { background-color: @bg-alt; }
 

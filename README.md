@@ -56,6 +56,22 @@ impiden que se ejecuten los siguientes. `RUN_THEME_SCRIPTS` en
 `src/config/appConfig.js` permite activar o desactivar estas ejecuciones tanto
 al iniciar AGS como al seleccionar un tema.
 
+Los scripts que se ejecutan al cambiar de workspace viven en
+`src/services/workspace_scripts/`. `RUN_WORKSPACES_SCRIPTS` los activa o
+desactiva. En `src/config/appConfig.js`, configura `ws1_script` a `ws10_script`
+con el nombre de un archivo `.sh` de esa carpeta y `ws1_args` a `ws10_args`
+con sus argumentos. Deja ambos valores como `""` para no ejecutar un script en
+ese workspace. Los argumentos aceptan comillas para conservar espacios y se
+pasan como argumentos separados. Por ejemplo:
+
+```js
+export let ws3_script = "open-project.sh"
+export let ws3_args = '"Proyecto de ejemplo" --restore'
+```
+
+El script se ejecuta cuando Hyprland confirma el cambio al workspace. Los
+cambios a estas opciones se recargan al guardar `appConfig.js`.
+
 La implementación activa usa los componentes `.tsx` desde `src/app.ts`.
 Para una funcionalidad nueva, edita el módulo dentro de `src/` que corresponda
 a su responsabilidad.

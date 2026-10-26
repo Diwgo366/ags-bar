@@ -71,7 +71,12 @@ function reloadAppConfig() {
     if (literal) updated[name] = parseObjectLiteral(literal)
   }
 
-  for (const name of ["RUN_THEME_SCRIPTS", "LOCALE"]) {
+  const scalarNames = ["RUN_THEME_SCRIPTS", "RUN_WORKSPACES_SCRIPTS", "LOCALE"]
+  for (let id = 1; id <= 10; id++) {
+    scalarNames.push(`ws${id}_script`, `ws${id}_args`)
+  }
+
+  for (const name of scalarNames) {
     const expression = new RegExp(`export\\s+(?:const|let)\\s+${name}\\s*=\\s*(true|false|-?\\d+|"(?:\\\\.|[^"\\\\])*"|'(?:\\\\.|[^'\\\\])*')`)
     const match = source.match(expression)
     if (!match) continue

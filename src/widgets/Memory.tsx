@@ -7,10 +7,12 @@ export default () => {
     try {
       const [ok, out] = GLib.file_get_contents("/proc/meminfo")
       if (!ok) return "N/A"
-      const lines = new TextDecoder().decode(out).split("\n")
-      const total = parseInt(lines[0].split(/\s+/)[1])
-      const avail = parseInt(lines[2].split(/\s+/)[1])
-      if (!total || !avail) return "N/A"
+      const content = new TextDecoder().decode(out)
+      const totalMatch = content.match(/^MemTotal:\s+(\d+)/m)
+      const availableMatch = content.match(/^MemAvailable:\s+(\d+)/m)
+      const total = Number(totalMatch?.[1])
+      const avail = Number(availableMatch?.[1])
+      if (!total || !Number.isFinite(avail)) return "N/A"
       const used = ((total - avail) / total) * 100
       return `${Math.round(used)}%`
     } catch {

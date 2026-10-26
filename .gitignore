@@ -8,6 +8,7 @@ node_modules/
 
 src/themes/theme.json
 src/config/privateConfig.js
+src/services/workspace_scripts/*.sh
 
 # Temporales, cachés y logs
 tmp/

@@ -1,6 +1,5 @@
-import { Astal, Gtk } from "ags/gtk4"
+import { Gtk } from "ags/gtk4"
 import GLib from "gi://GLib"
-import app from "ags/gtk4/app"
 import {
   CALENDAR,
   INTERVAL,
@@ -146,12 +145,6 @@ function createCalendarGrid() {
   })
   headerBox.append(nextWeek)
 
-  const closeBtn = new Gtk.Button({
-    label: "×",
-    halign: Gtk.Align.END,
-    css_classes: ["cal-close"],
-  })
-  headerBox.append(closeBtn)
   mainBox.append(headerBox)
 
   const scroll = new Gtk.ScrolledWindow({
@@ -279,17 +272,21 @@ for (let d = 0; d < CALENDAR.NUM_DAYS; d++) {
     const occupied: Record<string, boolean> = {}
 
     const hours = CALENDAR.END_HOUR - CALENDAR.START_HOUR
+    const eventsByHour = grouped.map((day: any) => {
+      const byHour = new Map<number, any>()
+      for (const event of day.events) {
+        if (!byHour.has(event.startHour)) byHour.set(event.startHour, event)
+      }
+      return byHour
+    })
+
     for (let h = 0; h <= hours; h++) {
       const hour = CALENDAR.START_HOUR + h
+      if (hour >= CALENDAR.END_HOUR) continue
       for (let d = 0; d < CALENDAR.NUM_DAYS; d++) {
         if (occupied[`${d},${h}`]) continue
 
-        const event = grouped[d].events.find(
-          (e: any) =>
-            e.startHour >= CALENDAR.START_HOUR &&
-            e.startHour < CALENDAR.END_HOUR &&
-            e.startHour === hour,
-        )
+        const event = eventsByHour[d]?.get(hour)
 
         if (event) {
           const colors = getCourseColors(event.summary)
@@ -371,7 +368,6 @@ for (let d = 0; d < CALENDAR.NUM_DAYS; d++) {
 
   return {
     mainBox,
-    closeBtn,
     previousWeek,
     nextWeek,
     weekOffset,
@@ -422,7 +418,6 @@ function enrichEvents(grouped: any[]) {
 function createCalendarPopup(calendarUrl: string) {
   const {
     mainBox,
-    closeBtn,
     previousWeek,
     nextWeek,
     weekOffset,
@@ -434,21 +429,14 @@ function createCalendarPopup(calendarUrl: string) {
   } =
     createCalendarGrid()
 
-  const window = new Astal.Window({
-    name: "calendar-popup",
-    layer: Astal.Layer.TOP,
-    exclusivity: Astal.Exclusivity.IGNORE,
-    visible: false,
-    keymode: Astal.Keymode.ON_DEMAND,
-    application: app,
-    child: mainBox,
-    width_request: 540,
-    height_request: 600,
-  })
-
-  closeBtn.connect("clicked", () => {
-    window.visible = false
-  })
+  const popover = new Gtk.Popover()
+  popover.set_autohide(true)
+  popover.set_has_arrow(false)
+  popover.set_position(Gtk.PositionType.BOTTOM)
+  popover.set_offset(0, 8)
+  popover.add_css_class("calendar-popover")
+  popover.set_child(mainBox)
+  popover.set_size_request(540, 600)
 
   let lastFetch = 0
   let lastEnriched: any[] | null = null
@@ -464,7 +452,7 @@ function createCalendarPopup(calendarUrl: string) {
   nextWeek.connect("clicked", () => navigateWeek(1))
 
   GLib.timeout_add(GLib.PRIORITY_DEFAULT, 60_000, () => {
-    if (window.visible && weekOffset.value === 0) updateNowLine()
+    if (popover.get_visible() && weekOffset.value === 0) updateNowLine()
     return GLib.SOURCE_CONTINUE
   })
 
@@ -492,25 +480,25 @@ function createCalendarPopup(calendarUrl: string) {
   function show() {
     renderGrid()
     refresh()
-    window.visible = true
+    popover.popup()
   }
 
   function hide() {
-    window.visible = false
+    popover.popdown()
   }
 
   function setCalendarUrl(url: string) {
     calendarUrl = url
     lastFetch = 0
     lastEnriched = null
-    if (window.visible) {
+    if (popover.get_visible()) {
       showLoading()
       refresh()
     }
   }
 
   function toggle() {
-    if (window.visible) {
+    if (popover.get_visible()) {
       hide()
     } else {
       show()
@@ -519,7 +507,7 @@ function createCalendarPopup(calendarUrl: string) {
 
   onThemeChange(() => {
     clearCourseColorCache()
-    if (window.visible && lastEnriched) {
+    if (popover.get_visible() && lastEnriched) {
       renderGrid()
       renderEvents(lastEnriched)
     }
@@ -527,22 +515,32 @@ function createCalendarPopup(calendarUrl: string) {
 
   onConfigChange((name) => {
     if (name !== "appConfig") return
-    if (!window.visible) return
+    if (!popover.get_visible()) return
     renderGrid()
     if (lastEnriched) renderEvents(lastEnriched)
   })
 
-  return { window, show, hide, toggle, refresh, setCalendarUrl }
+  function setAnchor(anchor: Gtk.Widget) {
+    const parent = popover.get_parent()
+    if (parent === anchor) return
+    if (parent) popover.unparent()
+    const overlayAnchor = anchor as Gtk.Overlay
+    overlayAnchor.add_overlay(popover)
+  }
+
+  return { toggle, setCalendarUrl, setAnchor }
 }
 
 let instance: ReturnType<typeof createCalendarPopup> | null = null
+let configuredCalendarUrl = ""
 
-export function getCalendarPopup(calendarUrl?: string) {
-  if (!instance) instance = createCalendarPopup(calendarUrl ?? "")
-  else if (calendarUrl !== undefined) instance.setCalendarUrl(calendarUrl)
-  return instance
+export function configureCalendarPopup(calendarUrl: string) {
+  configuredCalendarUrl = calendarUrl
+  instance?.setCalendarUrl(calendarUrl)
 }
 
-export default function CalendarPopup(calendarUrl?: string) {
-  return getCalendarPopup(calendarUrl)
+export function getCalendarPopup(calendarUrl?: string) {
+  if (!instance) instance = createCalendarPopup(calendarUrl ?? configuredCalendarUrl)
+  else if (calendarUrl !== undefined) instance.setCalendarUrl(calendarUrl)
+  return instance
 }
