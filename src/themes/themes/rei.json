@@ -1,0 +1,30 @@
+{
+  "name": "rei",
+  "icons": "Papirus",
+  "font": {
+    "family": "CaskaydiaMono Nerd Font",
+    "size": 13
+  },
+  "wallpaper": "/home/diego/Media/Imágenes/wallpapers/rei.mp4",
+  "colors": {
+    "bg": "#101112",
+    "bgAlt": "#050506",
+    "fg": "#F2F2F2",
+    "fgAlt": "#A6A6A6",
+    "accent": "#F02D3A",
+    "bd": "#3D3D3D",
+    "bdAlt": "#F2F2F2",
+    "red": "#F02D3A",
+    "green": "#28B463",
+    "yellow": "#F5C400",
+    "blue": "#168AAD",
+    "magenta": "#D63384",
+    "cyan": "#00A8A8",
+    "red_s": "#FF4D5A",
+    "green_s": "#45D982",
+    "yellow_s": "#FFD633",
+    "blue_s": "#31B5D5",
+    "magenta_s": "#F04FA2",
+    "cyan_s": "#20D5CB"
+  }
+}

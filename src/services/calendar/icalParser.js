@@ -252,13 +252,12 @@ function expandEvents(rawEvents, weekStart, weekEnd) {
   return expanded
 }
 
-function getWeekRange() {
-  const now = new Date()
-  const dayOfWeek = now.getDay()
+function getWeekRange(referenceDate = new Date()) {
+  const dayOfWeek = referenceDate.getDay()
   const mondayOffset = dayOfWeek === 0 ? -6 : 1 - dayOfWeek
 
-  const monday = new Date(now)
-  monday.setDate(now.getDate() + mondayOffset)
+  const monday = new Date(referenceDate)
+  monday.setDate(referenceDate.getDate() + mondayOffset)
   monday.setHours(0, 0, 0, 0)
 
   const sunday = new Date(monday)
@@ -296,9 +295,19 @@ function dateKey(date) {
   return `${y}-${m}-${d}`
 }
 
-export function fetchWeekEvents(icalUrl) {
+export function fetchWeekEvents(icalUrl, referenceDate = new Date()) {
   return new Promise((resolve, reject) => {
-    const msg = Soup.Message.new("GET", icalUrl)
+    const url = typeof icalUrl === "string" ? icalUrl.trim() : ""
+    if (!url) {
+      reject(new Error("Configura calendarUrl en src/config/privateConfig.js"))
+      return
+    }
+
+    const msg = Soup.Message.new("GET", url)
+    if (!msg) {
+      reject(new Error("La URL del calendario no es válida"))
+      return
+    }
 
     session.send_and_read_async(
       msg,
@@ -317,7 +326,7 @@ export function fetchWeekEvents(icalUrl) {
           const content = new TextDecoder().decode(bytes.get_data())
           const rawEvents = parseICalContent(content)
 
-          const { start: weekStart, end: weekEnd } = getWeekRange()
+          const { start: weekStart, end: weekEnd } = getWeekRange(referenceDate)
 
           const allEvents = expandEvents(rawEvents, weekStart, weekEnd)
 

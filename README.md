@@ -26,7 +26,7 @@ ventana `theme-selector`.
 src/app.ts              Entrada activa de AGS
 src/config/             Configuración general
 src/services/           Integraciones externas y lógica reutilizable
-src/services/theme_scripts/ Scripts ejecutados al aplicar un tema
+src/services/theme_scripts/ Integraciones ejecutadas por AGS
 src/themes/             Temas y gestión del CSS
 src/widgets/            Componentes de la interfaz
 
@@ -38,17 +38,23 @@ src/bar/
 
 src/themes/
   themes/*.json         Temas disponibles
-  current-theme.json    Tema seleccionado
-  base.js               Tema AGS generado
-  generate-ags-theme.py Generador de base.js
-  themeLoader.js        Carga el tema AGS generado
+  theme.json            Tema actualmente aplicado
+  theme.css.js          Generación y aplicación del CSS de AGS
 
 ```
 
-El daemon de fondos vive en `src/services/wallpaper-daemon.sh`. Los scripts
-ejecutables que se añadan a `src/services/theme_scripts/` se ejecutan cuando
-se aplica un tema. `RUN_THEME_SCRIPTS` en `src/config/appConfig.js` permite
-activar o desactivar este comportamiento.
+El daemon de fondos vive en `src/services/wallpaper-daemon.sh` y solo gestiona
+el wallpaper. AGS ejecuta al iniciar y al seleccionar un tema, en orden
+alfabético, todos los archivos regulares ejecutables directamente dentro de
+`src/services/theme_scripts/`. Al seleccionar, primero copia el JSON elegido a
+`src/themes/theme.json`; después corre las integraciones y actualiza su CSS.
+Cada script puede sincronizar los colores u otras propiedades del tema con otra aplicación.
+Para agregar una integración, coloca allí un script ejecutable (por ejemplo,
+`update-hyprland-borders.sh`) que lea el tema activo desde
+`$AGS_DIR/src/themes/theme.json`. Los errores de un script se registran y no
+impiden que se ejecuten los siguientes. `RUN_THEME_SCRIPTS` en
+`src/config/appConfig.js` permite activar o desactivar estas ejecuciones tanto
+al iniciar AGS como al seleccionar un tema.
 
 La implementación activa usa los componentes `.tsx` desde `src/app.ts`.
 Para una funcionalidad nueva, edita el módulo dentro de `src/` que corresponda
@@ -56,18 +62,17 @@ a su responsabilidad.
 
 ## Flujo para cambiar un tema
 
-1. El selector escribe `themes/current-theme.json`.
-2. `themes/generate-ags-theme.py` genera `themes/base.js`.
-3. `themeManager.js` vuelve a generar y aplica el CSS de AGS.
+1. El selector copia `themes/<nombre>.json` a `themes/theme.json`.
+2. Ejecuta los scripts de integración en `src/services/theme_scripts/`.
+3. `theme.css.js` aplica el CSS de AGS a partir de `theme.json`.
 
-La configuración privada se guarda fuera del repositorio, en
-`~/.config/ags/private-config.json`. El archivo se genera automáticamente al
-iniciar la aplicación si no existe. Edítalo y coloca la URL privada de Google
-Calendar en la propiedad `calendarUrl`:
+La configuración privada del calendario se guarda en
+`src/config/privateConfig.js`, excluido del repositorio. AGS lo genera al
+iniciar si no existe. Edita la propiedad `calendarUrl` en ese archivo:
 
-```json
-{
-  "calendarUrl": "https://calendar.google.com/calendar/ical/.../basic.ics"
+```js
+export const privateConfig = {
+  calendarUrl: "https://calendar.google.com/calendar/ical/.../basic.ics",
 }
 ```
 

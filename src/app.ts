@@ -7,7 +7,9 @@ import ThemeSelector from "./widgets/ThemeSelector.tsx"
 import { execAsync } from "ags/process"
 import GLib from "gi://GLib"
 import { applyTheme } from "./themes/theme.css.js"
-import { AGS_DIR, RUN_THEME_SCRIPTS } from "./config/appConfig.js"
+import { AGS_DIR } from "./config/appConfig.js"
+import { runThemeScripts } from "./services/themeScripts.js"
+import { onConfigChange, watchConfigFiles } from "./services/configWatcher.js"
 
 const privateConfigPath = AGS_DIR + "/src/config/privateConfig.js"
 if (!GLib.file_test(privateConfigPath, GLib.FileTest.EXISTS)) {
@@ -15,13 +17,17 @@ if (!GLib.file_test(privateConfigPath, GLib.FileTest.EXISTS)) {
     "// Auto-generado - edita este archivo directamente",
     "// Se regenera con valores por defecto si lo borras",
     "",
-    "export const privateConfig = {",
+    "export let privateConfig = {",
     '  calendarUrl: "",',
     "};",
+    "export function applyPrivateConfig(updated) {",
+    "  privateConfig = { ...privateConfig, ...updated };",
+    "}",
     "",
   ].join("\n")
   GLib.file_set_contents(privateConfigPath, content)
 }
+const { privateConfig } = await import("./config/privateConfig.js")
 
 const activeThemePath = AGS_DIR + "/src/themes/theme.json"
 if (!GLib.file_test(activeThemePath, GLib.FileTest.EXISTS)) {
@@ -35,15 +41,14 @@ if (!GLib.file_test(activeThemePath, GLib.FileTest.EXISTS)) {
 }
 
 await applyTheme()
+await runThemeScripts()
 
 app.start({
   css: "",
   main() {
     // Keep wallpaper updates available regardless of which Hyprland script
     // started AGS. The daemon's lock makes a manually started copy harmless.
-    void execAsync(["bash", AGS_DIR + "/src/services/wallpaper-daemon.sh"], {
-      RUN_THEME_SCRIPTS: String(RUN_THEME_SCRIPTS),
-    }).catch((error) =>
+    void execAsync(["bash", AGS_DIR + "/src/services/wallpaper-daemon.sh"]).catch((error) =>
       console.error("No se pudo iniciar wallpaper-daemon:", error),
     )
 
@@ -54,7 +59,13 @@ app.start({
     const windows = primaryMonitor ? [Bar(primaryMonitor)] : []
 
     const overlay = Overlay()
-    const calendarPopup = CalendarPopup()
+    const calendarPopup = CalendarPopup(privateConfig.calendarUrl)
+    void watchConfigFiles().catch((error) =>
+      console.error("No se pudo iniciar el vigilante de configuración:", error),
+    )
+    onConfigChange((name, value) => {
+      if (name === "privateConfig") calendarPopup.setCalendarUrl(value.calendarUrl)
+    })
     const themeSelector = ThemeSelector()
 
     return [

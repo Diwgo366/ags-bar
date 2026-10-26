@@ -1,0 +1,30 @@
+{
+  "name": "zygarde",
+  "icons": "Papirus",
+  "font": {
+    "family": "CaskaydiaMono Nerd Font",
+    "size": 13
+  },
+  "wallpaper": "/home/diego/Media/Imágenes/wallpapers/zygarde.png",
+  "colors": {
+    "bg": "#362B2E",
+    "bgAlt": "#2C2326",
+    "fg": "#F1ECE5",
+    "fgAlt": "#B8AAA7",
+    "accent": "#76B92B",
+    "bd": "#58494A",
+    "bdAlt": "#E6E9D7",
+    "red": "#D85A4A",
+    "green": "#6EAD2E",
+    "yellow": "#D9B84E",
+    "blue": "#6A9B78",
+    "magenta": "#A87991",
+    "cyan": "#73AAA0",
+    "red_s": "#F07967",
+    "green_s": "#91CE4E",
+    "yellow_s": "#F0D16B",
+    "blue_s": "#8AB99A",
+    "magenta_s": "#C495AC",
+    "cyan_s": "#95C9BD"
+  }
+}

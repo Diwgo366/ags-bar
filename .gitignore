@@ -5,17 +5,9 @@ project-info.md
 node_modules/
 @girs/
 
-# Archivos generados por la aplicación
-src/themes/base.js
-src/themes/current-theme.json
+
 src/themes/theme.json
 src/config/privateConfig.js
-src/themes/themes/*.json
-!src/themes/themes/default.json
-
-# Scripts locales para adaptar aplicaciones externas a cada tema.
-# Se ignora el contenido, pero se conserva la carpeta con su .gitkeep.
-src/services/theme_scripts/*
 
 # Temporales, cachés y logs
 tmp/

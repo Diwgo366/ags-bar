@@ -1,9 +1,19 @@
 import { Astal, Gtk } from "ags/gtk4"
+import GLib from "gi://GLib"
 import app from "ags/gtk4/app"
-import { CALENDAR, INTERVAL, LOCALE } from "../config/appConfig.js"
-import { privateConfig } from "../config/privateConfig.js"
+import {
+  CALENDAR,
+  INTERVAL,
+  LOCALE,
+} from "../config/appConfig.js"
 import { fetchWeekEvents } from "../services/calendar/icalParser.js"
-import { getThemeColors, registerCalendarStyle } from "../themes/theme.css.js"
+import { onConfigChange } from "../services/configWatcher.js"
+import {
+  clearCalendarStyles,
+  getThemeColors,
+  onThemeChange,
+  registerCalendarStyle,
+} from "../themes/theme.css.js"
 
 function hashString(str: string) {
   let hash = 0
@@ -19,6 +29,14 @@ const courseColorCache: Record<
   { bg: string; border: string; cssClass: string }
 > = {}
 const registeredCourses = new Set<string>()
+
+function clearCourseColorCache() {
+  for (const name of Object.keys(courseColorCache)) {
+    delete courseColorCache[name]
+  }
+  registeredCourses.clear()
+  clearCalendarStyles()
+}
 
 const themeColorNames = [
   "red",
@@ -106,6 +124,14 @@ function createCalendarGrid() {
     spacing: 8,
   })
 
+  const weekOffset = { value: 0 }
+
+  const previousWeek = new Gtk.Button({
+    label: "‹",
+    css_classes: ["cal-week-nav"],
+  })
+  headerBox.append(previousWeek)
+
   const titleLabel = new Gtk.Label({
     label: "Calendario",
     halign: Gtk.Align.CENTER,
@@ -113,6 +139,12 @@ function createCalendarGrid() {
     css_classes: ["cal-header"],
   })
   headerBox.append(titleLabel)
+
+  const nextWeek = new Gtk.Button({
+    label: "›",
+    css_classes: ["cal-week-nav"],
+  })
+  headerBox.append(nextWeek)
 
   const closeBtn = new Gtk.Button({
     label: "×",
@@ -130,11 +162,53 @@ function createCalendarGrid() {
 
   const grid = new Gtk.Grid({
     column_homogeneous: false,
+    row_homogeneous: true,
     column_spacing: 0,
     row_spacing: 0,
   })
   scroll.set_child(grid)
   mainBox.append(scroll)
+
+  const nowLine = new Gtk.Box({
+    css_classes: ["cal-now-line"],
+    valign: Gtk.Align.START,
+    margin_top: -1,
+  })
+  nowLine.set_can_target(false)
+  nowLine.set_visible(false)
+  function updateNowLine() {
+    const now = new Date()
+    const today = now.getDay()
+    const dayIndex = today === 0 ? 6 : today - 1
+    const hour = now.getHours() + now.getMinutes() / 60
+    if (
+      dayIndex < 0 ||
+      dayIndex >= CALENDAR.NUM_DAYS ||
+      hour < CALENDAR.START_HOUR ||
+      hour >= CALENDAR.END_HOUR
+    ) {
+      nowLine.set_visible(false)
+      return
+    }
+
+    const row = Math.floor(hour - CALENDAR.START_HOUR)
+    const rowLabel = grid.get_child_at(0, row + 1)
+    const allocatedRowHeight = rowLabel?.get_allocated_height() ?? 0
+    const rowHeight = Math.max(allocatedRowHeight, CALENDAR.HOUR_HEIGHT)
+    nowLine.set_margin_top(
+      Math.round(((hour - CALENDAR.START_HOUR) % 1) * rowHeight),
+    )
+    if (nowLine.get_parent()) grid.remove(nowLine)
+    grid.attach(nowLine, dayIndex + 1, row + 1, 1, 1)
+    nowLine.set_visible(true)
+  }
+
+  function queueNowLineUpdate() {
+    GLib.idle_add(GLib.PRIORITY_DEFAULT_IDLE, () => {
+      if (weekOffset.value === 0) updateNowLine()
+      return GLib.SOURCE_REMOVE
+    })
+  }
 
   function renderGrid() {
     clearChildren(grid)
@@ -143,18 +217,26 @@ function createCalendarGrid() {
     grid.attach(emptyTop, 0, 0, 1, 1)
 
     const now = new Date()
-    const today = now.getDay()
+    const reference = new Date(now)
+    reference.setDate(reference.getDate() + weekOffset.value * 7)
+    const today = reference.getDay()
     const mondayOffset = today === 0 ? -6 : 1 - today
-    const monday = new Date(now)
-    monday.setDate(now.getDate() + mondayOffset)
+    const monday = new Date(reference)
+    monday.setDate(reference.getDate() + mondayOffset)
     monday.setHours(0, 0, 0, 0)
+
+    const sunday = new Date(monday)
+    sunday.setDate(monday.getDate() + 6)
+    titleLabel.set_label(
+      `${monday.toLocaleDateString(LOCALE, { day: "numeric", month: "short" })} – ${sunday.toLocaleDateString(LOCALE, { day: "numeric", month: "short", year: "numeric" })}`,
+    )
 
     for (let d = 0; d < CALENDAR.NUM_DAYS; d++) {
       const date = new Date(monday)
       date.setDate(monday.getDate() + d)
       const dayName = ["Dom", "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"][date.getDay()]
       const dayStr = date.toLocaleDateString(LOCALE, { day: "2-digit", month: "2-digit" })
-      const isToday = date.toDateString() === now.toDateString()
+      const isToday = weekOffset.value === 0 && date.toDateString() === now.toDateString()
       const lbl = new Gtk.Label({
         label: `${dayName} ${dayStr}`,
         hexpand: true,
@@ -173,6 +255,7 @@ function createCalendarGrid() {
         label: `${hour.toString().padStart(2, "0")}:00`,
         css_classes: ["cal-hour-label"],
         halign: Gtk.Align.END,
+        valign: Gtk.Align.START,
         margin_end: 4,
       })
       grid.attach(hourLabel, 0, h + 1, 1, 1)
@@ -186,6 +269,10 @@ for (let d = 0; d < CALENDAR.NUM_DAYS; d++) {
         grid.attach(empty, d + 1, h + 1, 1, 1)
       }
     }
+
+    if (weekOffset.value === 0) updateNowLine()
+    else nowLine.set_visible(false)
+    queueNowLineUpdate()
     }
 
   function renderEvents(grouped: any[]) {
@@ -207,6 +294,7 @@ for (let d = 0; d < CALENDAR.NUM_DAYS; d++) {
         if (event) {
           const colors = getCourseColors(event.summary)
           registerCourseStyle(event.summary)
+          const span = Math.min(event.duration || 1, hours - h)
 
           const eventBox = new Gtk.Box({
             orientation: Gtk.Orientation.VERTICAL,
@@ -214,27 +302,29 @@ for (let d = 0; d < CALENDAR.NUM_DAYS; d++) {
             hexpand: false,
             vexpand: true,
           })
-          eventBox.set_size_request(120, -1)
-
-          const timeLbl = new Gtk.Label({
-            label: event.endTime
-              ? `${event.startTime} - ${event.endTime}`
-              : event.startTime,
-            css_classes: ["cal-event-time"],
-            halign: Gtk.Align.START,
-          })
-          eventBox.append(timeLbl)
+          eventBox.set_size_request(120, span * CALENDAR.HOUR_HEIGHT)
 
           const titleLbl = new Gtk.Label({
             label: event.summary,
             css_classes: ["cal-event-title"],
             halign: Gtk.Align.START,
             ellipsize: 3,
-            wrap: true,
+            wrap: false,
           })
           eventBox.append(titleLbl)
 
-          if (event.salon) {
+          if (span > 1 && CALENDAR.SHOW_HOUR) {
+            const timeLbl = new Gtk.Label({
+              label: event.endTime
+                ? `${event.startTime} - ${event.endTime}`
+                : event.startTime,
+              css_classes: ["cal-event-time"],
+              halign: Gtk.Align.START,
+            })
+            eventBox.prepend(timeLbl)
+          }
+
+          if (span > 1 && CALENDAR.SHOW_EXTRA && event.salon) {
             const salonLbl = new Gtk.Label({
               label: event.salon,
               css_classes: ["cal-event-salon"],
@@ -243,7 +333,6 @@ for (let d = 0; d < CALENDAR.NUM_DAYS; d++) {
             eventBox.append(salonLbl)
           }
 
-          const span = Math.min(event.duration || 1, hours - h)
           const child = grid.get_child_at(d + 1, h + 1)
           if (child) grid.remove(child)
           grid.attach(eventBox, d + 1, h + 1, 1, span)
@@ -254,6 +343,10 @@ for (let d = 0; d < CALENDAR.NUM_DAYS; d++) {
         }
       }
     }
+
+    if (weekOffset.value === 0) updateNowLine()
+    else nowLine.set_visible(false)
+    queueNowLineUpdate()
   }
 
   function showLoading() {
@@ -269,14 +362,25 @@ for (let d = 0; d < CALENDAR.NUM_DAYS; d++) {
   function showError(msg: string) {
     clearChildren(grid)
     const error = new Gtk.Label({
-      label: `Error: ${msg}`,
+      label: `Error: ${String(msg || "No se pudo cargar el calendario")}`,
       margin_top: 20,
       margin_bottom: 20,
     })
     grid.attach(error, 0, 0, CALENDAR.NUM_DAYS + 1, 1)
   }
 
-  return { mainBox, closeBtn, renderGrid, renderEvents, showLoading, showError }
+  return {
+    mainBox,
+    closeBtn,
+    previousWeek,
+    nextWeek,
+    weekOffset,
+    renderGrid,
+    renderEvents,
+    showLoading,
+    showError,
+    updateNowLine,
+  }
 }
 
 function enrichEvents(grouped: any[]) {
@@ -315,10 +419,20 @@ function enrichEvents(grouped: any[]) {
   return grouped
 }
 
-function createCalendarPopup() {
-  const { mainBox, closeBtn, renderGrid, renderEvents, showLoading, showError } =
+function createCalendarPopup(calendarUrl: string) {
+  const {
+    mainBox,
+    closeBtn,
+    previousWeek,
+    nextWeek,
+    weekOffset,
+    renderGrid,
+    renderEvents,
+    showLoading,
+    showError,
+    updateNowLine,
+  } =
     createCalendarGrid()
-  const { calendarUrl } = privateConfig
 
   const window = new Astal.Window({
     name: "calendar-popup",
@@ -339,6 +453,21 @@ function createCalendarPopup() {
   let lastFetch = 0
   let lastEnriched: any[] | null = null
 
+  function navigateWeek(offset: number) {
+    weekOffset.value += offset
+    lastFetch = 0
+    lastEnriched = null
+    show()
+  }
+
+  previousWeek.connect("clicked", () => navigateWeek(-1))
+  nextWeek.connect("clicked", () => navigateWeek(1))
+
+  GLib.timeout_add(GLib.PRIORITY_DEFAULT, 60_000, () => {
+    if (window.visible && weekOffset.value === 0) updateNowLine()
+    return GLib.SOURCE_CONTINUE
+  })
+
   function refresh() {
     const now = Date.now()
     if (now - lastFetch < INTERVAL.CALENDAR) {
@@ -346,7 +475,9 @@ function createCalendarPopup() {
       return
     }
 
-    fetchWeekEvents(calendarUrl)
+    const referenceDate = new Date()
+    referenceDate.setDate(referenceDate.getDate() + weekOffset.value * 7)
+    fetchWeekEvents(calendarUrl, referenceDate)
       .then((grouped) => {
         const enriched = enrichEvents(grouped)
         lastEnriched = enriched
@@ -354,7 +485,7 @@ function createCalendarPopup() {
         lastFetch = Date.now()
       })
       .catch((e: Error) => {
-        showError(e.message || "No se pudo cargar el calendario")
+        showError(e instanceof Error ? e.message : "No se pudo cargar el calendario")
       })
   }
 
@@ -368,6 +499,16 @@ function createCalendarPopup() {
     window.visible = false
   }
 
+  function setCalendarUrl(url: string) {
+    calendarUrl = url
+    lastFetch = 0
+    lastEnriched = null
+    if (window.visible) {
+      showLoading()
+      refresh()
+    }
+  }
+
   function toggle() {
     if (window.visible) {
       hide()
@@ -376,16 +517,32 @@ function createCalendarPopup() {
     }
   }
 
-  return { window, show, hide, toggle, refresh }
+  onThemeChange(() => {
+    clearCourseColorCache()
+    if (window.visible && lastEnriched) {
+      renderGrid()
+      renderEvents(lastEnriched)
+    }
+  })
+
+  onConfigChange((name) => {
+    if (name !== "appConfig") return
+    if (!window.visible) return
+    renderGrid()
+    if (lastEnriched) renderEvents(lastEnriched)
+  })
+
+  return { window, show, hide, toggle, refresh, setCalendarUrl }
 }
 
 let instance: ReturnType<typeof createCalendarPopup> | null = null
 
-export function getCalendarPopup() {
-  if (!instance) instance = createCalendarPopup()
+export function getCalendarPopup(calendarUrl?: string) {
+  if (!instance) instance = createCalendarPopup(calendarUrl ?? "")
+  else if (calendarUrl !== undefined) instance.setCalendarUrl(calendarUrl)
   return instance
 }
 
-export default function CalendarPopup() {
-  return getCalendarPopup()
+export default function CalendarPopup(calendarUrl?: string) {
+  return getCalendarPopup(calendarUrl)
 }

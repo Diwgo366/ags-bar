@@ -1,0 +1,30 @@
+{
+  "name": "astronaut",
+  "icons": "Papirus",
+  "font": {
+    "family": "CaskaydiaMono Nerd Font",
+    "size": 13
+  },
+  "wallpaper": "/home/diego/Media/Imágenes/wallpapers/astronaut.png",
+  "colors": {
+    "bg": "#1C2435",
+    "bgAlt": "#111827",
+    "fg": "#F1F6FC",
+    "fgAlt": "#AABBD0",
+    "accent": "#43B7FF",
+    "bd": "#344B6D",
+    "bdAlt": "#F1F6FC",
+    "red": "#FF5263",
+    "green": "#36D399",
+    "yellow": "#FFD166",
+    "blue": "#3987FF",
+    "magenta": "#D65BFF",
+    "cyan": "#22D3EE",
+    "red_s": "#FF7480",
+    "green_s": "#5DEBB0",
+    "yellow_s": "#FFE08A",
+    "blue_s": "#69A5FF",
+    "magenta_s": "#E27BFF",
+    "cyan_s": "#5CE8F5"
+  }
+}

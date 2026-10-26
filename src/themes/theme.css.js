@@ -169,16 +169,19 @@ popover button:hover, popover button:checked { border-color: @accent; background
   color: @fg-alt;
 }
 
-.cal-popup { background-color: @bg; border-radius: 12px; border: 2px solid @bd; padding: 12px; }
+.cal-popup { background-color: ${c.bg}; border-radius: 12px; border: 2px solid @bd; padding: 12px; }
 .cal-header { color: @fg; font-weight: bold; font-size: 15px; }
 .cal-day-header { color: @fg-alt; font-size: 11px; font-weight: bold; }
-.cal-day-header.today { color: @green; }
+.cal-day-header.today { color: @accent; }
 .cal-hour-label { color: @fg-alt; font-size: 10px; }
-.cal-cell { background-color: alpha(${c.bd}, 0.1); border-bottom: 1px solid alpha(${c.bd}, 0.2); border-right: 1px solid alpha(${c.bd}, 0.2); padding: 2px; }
-.cal-event { border-radius: 4px; border-left: 3px solid; padding: 3px 5px; }
+.cal-now-line { min-height: 1px; background-color: @accent; }
+.cal-cell { background-color: alpha(${c.bd}, 0.1); border-bottom: 1px solid alpha(${c.bd}, 0.2); border-right: 1px solid alpha(${c.bd}, 0.2); padding: 0; }
+.cal-event { border-radius: 4px; border-left: 0; padding: 0 5px; }
 .cal-event-time, .cal-event-title, .cal-event-salon { color: @fg; }
 .cal-close { background: transparent; border: none; color: @fg-alt; font-size: 18px; min-width: 24px; min-height: 24px; }
 .cal-close:hover { color: @red; }
+.cal-week-nav { background: transparent; border: 0; color: @accent; font-size: 24px; min-width: 28px; min-height: 28px; }
+.cal-week-nav:hover { background-color: @bg-alt; }
 
 /* Theme Selector Styles */
 .theme-selector-window {
@@ -219,6 +222,13 @@ popover button:hover, popover button:checked { border-color: @accent; background
   background-color: alpha(${c.bgAlt}, 0.96);
 }
 
+.wallpaper-preview-frame {
+  min-width: 320px;
+  min-height: 180px;
+  border-radius: 4px;
+  background-color: @bg;
+}
+
 .wallpaper-preview {
   min-width: 320px;
   min-height: 180px;
@@ -244,6 +254,7 @@ let cssProvider = null
 let calendarStyleProvider = null
 let calendarStyles = ""
 let themeMonitor = null
+const themeChangeListeners = new Set()
 
 function watchThemeFile() {
   if (themeMonitor) return
@@ -274,6 +285,18 @@ export function registerCalendarStyle(cssClass, background, border) {
   calendarStyleProvider.load_from_string(calendarStyles)
 }
 
+export function clearCalendarStyles() {
+  calendarStyles = ""
+  if (calendarStyleProvider) {
+    calendarStyleProvider.load_from_string("")
+  }
+}
+
+export function onThemeChange(callback) {
+  themeChangeListeners.add(callback)
+  return () => themeChangeListeners.delete(callback)
+}
+
 export function applyTheme() {
   watchThemeFile()
 
@@ -300,6 +323,14 @@ export function applyTheme() {
     cssProvider,
     Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION,
   )
+
+  for (const callback of themeChangeListeners) {
+    try {
+      callback()
+    } catch (error) {
+      console.error("Error actualizando widgets tras cambiar el tema:", error)
+    }
+  }
 }
 
 export function reloadTheme() {

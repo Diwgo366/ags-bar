@@ -1,4 +1,3 @@
-import GLib from "gi://GLib"
 import { createPoll } from "ags/time"
 import { execAsync } from "ags/process"
 import { INTERVAL } from "../config/appConfig.js"
@@ -10,20 +9,7 @@ type NetworkInfo = {
   signal: number | null
 }
 
-const DEBUG_LOG = "/tmp/ags-network-debug.log"
 const OFFLINE: NetworkInfo = { state: "offline", name: "", signal: null }
-
-function debugNetwork(event: string, details: Record<string, unknown>) {
-  try {
-    const timestamp = new Date().toISOString()
-    const line = `${JSON.stringify({ timestamp, event, ...details })}\n`
-    const [ok, previous] = GLib.file_get_contents(DEBUG_LOG)
-    const existing = ok ? new TextDecoder().decode(previous) : ""
-    GLib.file_set_contents(DEBUG_LOG, existing + line)
-  } catch (error) {
-    console.warn("No se pudo escribir el log de diagnóstico de red:", error)
-  }
-}
 
 function stripAnsi(value: string) {
   return value.replace(/\u001b\[[0-?]*[ -/]*[@-~]/g, "")
@@ -64,7 +50,6 @@ async function getNetworkState(): Promise<NetworkInfo> {
       "status",
     ])
     const cleanOutput = stripAnsi(out).trim()
-    debugNetwork("nmcli-device-status", { output: cleanOutput })
 
     let wifiAvailable = false
     for (const line of cleanOutput.split("\n")) {
@@ -85,14 +70,13 @@ async function getNetworkState(): Promise<NetworkInfo> {
             .map((wifiLine) => parseTerseLine(stripAnsi(wifiLine)))
             .find(([inUse]) => inUse === "*")
         } catch (error) {
-          debugNetwork("wifi-details-error", { error: String(error) })
+          console.warn("No se pudieron consultar los detalles del Wi-Fi:", error)
         }
         const result: NetworkInfo = {
           state: "wifi",
           name: active?.[1] || connection || "Wi-Fi",
           signal: active?.[2] ? Number(active[2]) : null,
         }
-        debugNetwork("detected-state", { type, state, ...result })
         return result
       }
       if (state === "connected" && type === "ethernet") {
@@ -101,7 +85,6 @@ async function getNetworkState(): Promise<NetworkInfo> {
           name: connection || "Ethernet",
           signal: null,
         }
-        debugNetwork("detected-state", { type, state, ...result })
         return result
       }
       if (type === "wifi" && state !== "unavailable") wifiAvailable = true
@@ -114,14 +97,8 @@ async function getNetworkState(): Promise<NetworkInfo> {
         : wifiAvailable
           ? "disconnected"
           : "offline"
-    debugNetwork("detected-state", {
-      wifiAvailable,
-      wifiRadio: wifiRadio.trim(),
-      state,
-    })
     return { state, name: "", signal: null }
   } catch (error) {
-    debugNetwork("query-error", { error: String(error) })
     console.warn("No se pudo consultar el estado de red con nmcli:", error)
     return OFFLINE
   }
@@ -130,7 +107,7 @@ async function getNetworkState(): Promise<NetworkInfo> {
 export default () => {
   const status = createPoll(OFFLINE, INTERVAL.NETWORK, () =>
     getNetworkState().catch((error) => {
-      debugNetwork("poll-error", { error: String(error) })
+      console.warn("Error actualizando el estado de red:", error)
       return OFFLINE
     }),
   )

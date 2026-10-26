@@ -1,0 +1,30 @@
+{
+  "name": "yveltal",
+  "icons": "Papirus",
+  "wallpaper": "/home/diego/Media/Imágenes/wallpapers/yveltal.png",
+  "colors": {
+    "bg": "#292B29",
+    "bgAlt": "#191B19",
+    "fg": "#FFF4EF",
+    "fgAlt": "#C4BDB8",
+    "accent": "#FF4B3E",
+    "bd": "#585A55",
+    "bdAlt": "#FFF4EF",
+    "red": "#F04452",
+    "green": "#85C91E",
+    "yellow": "#FFC247",
+    "blue": "#35A9C8",
+    "magenta": "#E64B87",
+    "cyan": "#22C7B8",
+    "red_s": "#FF6670",
+    "green_s": "#A4E635",
+    "yellow_s": "#FFD166",
+    "blue_s": "#55C9E8",
+    "magenta_s": "#FF65A3",
+    "cyan_s": "#48E2D2"
+  },
+  "font": {
+    "family": "CaskaydiaMono Nerd Font",
+    "size": 13
+  }
+}

@@ -1,0 +1,30 @@
+{
+  "name": "Odyssey",
+  "icons": "Papirus",
+  "font": {
+    "family": "CaskaydiaMono Nerd Font",
+    "size": 13
+  },
+  "wallpaper": "/home/diego/Media/Imágenes/wallpapers/space.png",
+  "colors": {
+    "bg": "#0D0D0E",
+    "bgAlt": "#171A21",
+    "fg": "#F2F6FC",
+    "fgAlt": "#AEBBCB",
+    "accent": "#22D3C5",
+    "bd": "#292B31",
+    "bdAlt": "#F2F6FC",
+    "red": "#F2545B",
+    "green": "#1ED760",
+    "yellow": "#D6A832",
+    "blue": "#3987FF",
+    "magenta": "#C14DFF",
+    "cyan": "#22D3C5",
+    "red_s": "#FF777D",
+    "green_s": "#55F28A",
+    "yellow_s": "#FFD166",
+    "blue_s": "#70A8FF",
+    "magenta_s": "#D98CFF",
+    "cyan_s": "#63E9DF"
+  }
+}

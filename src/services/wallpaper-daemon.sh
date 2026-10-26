@@ -1,5 +1,5 @@
 #!/bin/bash
-# Wallpaper daemon - robust version, managed by AGS
+# Wallpaper daemon - managed by AGS
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../.." && pwd)"
 AGS_SCRIPT="${AGS_SCRIPT:-${AGS_DIR:-$SCRIPT_DIR}/src/app.ts}"
 
@@ -15,9 +15,6 @@ HYPERPAPER_PIDFILE="${HYPERPAPER_PIDFILE:-$RUNTIME_DIR/ags-hyprpaper.pid}"
 MODEFILE="${MODEFILE:-$RUNTIME_DIR/hypr-monitor-mode}"
 LOCKFILE="${LOCKFILE:-$RUNTIME_DIR/ags-wallpaper-daemon.lock}"
 CACHE_DIR="${XDG_CACHE_HOME:-${HOME:-/tmp}/.cache}/ags/wallpapers"
-THEME_SCRIPTS_DIR="$SCRIPT_DIR/src/services/theme_scripts"
-RUN_THEME_SCRIPTS="${RUN_THEME_SCRIPTS:-true}"
-
 MANAGER_PID="${MANAGER_PID:-/run/user/$(id -u)/ags-wallpaper-manager.pid}"
 
 mkdir -p "$RUNTIME_DIR"
@@ -30,22 +27,8 @@ echo $$ > "$MANAGER_PID"
 
 log() { echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*" >> "$LOG_FILE"; }
 
-run_theme_scripts() {
-    [[ "$RUN_THEME_SCRIPTS" == "true" ]] || return 0
-    mkdir -p "$THEME_SCRIPTS_DIR"
-
-    local script
-    while IFS= read -r -d '' script; do
-        if [[ -x "$script" ]]; then
-            log "Running theme script: ${script##*/}"
-            "$script" >> "$LOG_FILE" 2>&1 || log "Theme script failed: ${script##*/}"
-        fi
-    done < <(find "$THEME_SCRIPTS_DIR" -maxdepth 1 -type f -print0 | sort -z)
-}
-
 # Find the AGS instance running this project. The shell that starts AGS with
-# `daemon.sh & ags run ...` remains alive at the prompt after AGS exits, so
-# PPID alone cannot be used as a lifetime check.
+# `ags run` may remain alive after AGS exits, so PPID alone is not reliable.
 find_ags_pid() {
     local cmdline pid arg
     local -a args
@@ -179,14 +162,23 @@ apply_wallpaper() {
     local -a monitors
 
     wallpaper=$(jq -r '.wallpaper // empty' "$THEME_FILE" 2>/dev/null || true)
-    if [[ -z "$wallpaper" || ! -f "$wallpaper" ]]; then
-        log "Wallpaper not found or empty: '${wallpaper:-}'"
+    if [[ -z "$wallpaper" ]]; then
+        log "No wallpaper configured; clearing the current desktop background"
+        stop_video_monitor
         stop_wallpapers
+        if command -v hyprctl >/dev/null 2>&1; then
+            hyprctl hyprpaper unload all >> "$LOG_FILE" 2>&1 || true
+        fi
         stop_managed_hyprpaper
         return
     fi
 
-    run_theme_scripts
+    if [[ ! -f "$wallpaper" ]]; then
+        log "Wallpaper not found: '$wallpaper'"
+        stop_wallpapers
+        stop_managed_hyprpaper
+        return
+    fi
 
     stop_video_monitor
     stop_wallpapers

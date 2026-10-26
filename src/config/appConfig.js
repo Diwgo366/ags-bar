@@ -8,17 +8,17 @@ export const AGS_DIR = (() => {
   return dir
 })()
 
-// Ejecuta los scripts de src/services/theme_scripts al cambiar de tema.
-export const RUN_THEME_SCRIPTS = true
+// Ejecuta las integraciones de tema al iniciar AGS y al seleccionar un tema.
+export let RUN_THEME_SCRIPTS = true
 
-export const LOCALE = "es-PE"
-export const TIME_FORMAT = {
+export let LOCALE = "es-PE"
+export let TIME_FORMAT = {
   hour: "2-digit",
   minute: "2-digit",
   second: "2-digit",
   hourCycle: "h23",
 }
-export const DATE_FORMAT = {
+export let DATE_FORMAT = {
   weekday: "short",
   day: "numeric",
   month: "long",
@@ -28,7 +28,7 @@ export const DATE_FORMAT = {
 // 1000 ms = 1 segundo.
 // Aumentar estos valores reduce el consumo de CPU y batería,
 // pero hace que la información en la barra tarde más en actualizarse.
-export const INTERVAL = {
+export let INTERVAL = {
   // Reloj principal (actualiza cada segundo para mostrar los segundos correctamente)
   CLOCK: 1000,
 
@@ -55,16 +55,28 @@ export const INTERVAL = {
 }
 
 // Overlay / OSD configuration
-export const OVERLAY = {
+export let OVERLAY = {
   FADE_DURATION: 150,
   HIDE_DELAY: 750,
   LED_POLL_INTERVAL: 200,
 }
 
 // Configuración del calendario semanal (popup)
-export const CALENDAR = {
+export let CALENDAR = {
   START_HOUR: 8,
-  END_HOUR: 21,
-  HOUR_HEIGHT: 30,
+  END_HOUR: 22,
+  SHOW_HOUR: true,
+  SHOW_EXTRA: true,
+  HOUR_HEIGHT: 20,
   NUM_DAYS: 7,
+}
+
+export function applyAppConfig(updated) {
+  if (updated.RUN_THEME_SCRIPTS !== undefined) RUN_THEME_SCRIPTS = updated.RUN_THEME_SCRIPTS
+  if (updated.LOCALE !== undefined) LOCALE = updated.LOCALE
+  if (updated.TIME_FORMAT) TIME_FORMAT = { ...TIME_FORMAT, ...updated.TIME_FORMAT }
+  if (updated.DATE_FORMAT) DATE_FORMAT = { ...DATE_FORMAT, ...updated.DATE_FORMAT }
+  if (updated.INTERVAL) INTERVAL = { ...INTERVAL, ...updated.INTERVAL }
+  if (updated.OVERLAY) OVERLAY = { ...OVERLAY, ...updated.OVERLAY }
+  if (updated.CALENDAR) CALENDAR = { ...CALENDAR, ...updated.CALENDAR }
 }

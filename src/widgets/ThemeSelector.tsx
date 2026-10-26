@@ -1,12 +1,11 @@
 import app from "ags/gtk4/app"
 import { Astal, Gtk, Gdk } from "ags/gtk4"
 import { createState, createComputed } from "ags"
-import { execAsync } from "ags/process"
 import GLib from "gi://GLib"
 import Gio from "gi://Gio"
-import GdkPixbuf from "gi://GdkPixbuf?version=2.0"
 import { applyTheme } from "../themes/theme.css.js"
-import { AGS_DIR, RUN_THEME_SCRIPTS } from "../config/appConfig.js"
+import { AGS_DIR } from "../config/appConfig.js"
+import { runThemeScripts } from "../services/themeScripts.js"
 
 const THEMES_DIR = `${AGS_DIR}/src/themes`
 
@@ -92,7 +91,7 @@ function createWallpaperThumbnail(wallpaperPath: string): string {
       signature,
       -1,
     )
-    const thumbnailPath = `${cacheDir}/${cacheKey}.jpg`
+    const thumbnailPath = `${cacheDir}/${cacheKey}-color-v2.jpg`
     if (GLib.file_test(thumbnailPath, GLib.FileTest.EXISTS)) {
       return thumbnailPath
     }
@@ -103,8 +102,21 @@ function createWallpaperThumbnail(wallpaperPath: string): string {
       const filter = "scale=320:180:force_original_aspect_ratio=decrease,pad=320:180:(ow-iw)/2:(oh-ih)/2"
       const [ok, , , status] = GLib.spawn_sync(
         null,
-        ["ffmpeg", "-v", "error", "-ss", "0.5", "-i", wallpaperPath,
-          "-frames:v", "1", "-vf", filter, "-y", thumbnailPath],
+        [
+          "ffmpeg",
+          "-v",
+          "error",
+          "-ss",
+          "0.5",
+          "-i",
+          wallpaperPath,
+          "-frames:v",
+          "1",
+          "-vf",
+          filter,
+          "-y",
+          thumbnailPath,
+        ],
         null,
         GLib.SpawnFlags.SEARCH_PATH,
         null,
@@ -118,9 +130,33 @@ function createWallpaperThumbnail(wallpaperPath: string): string {
     const imageExtensions = new Set(["jpg", "jpeg", "png", "webp", "bmp", "gif"])
     if (!imageExtensions.has(extension)) return ""
 
-    const thumbnail = GdkPixbuf.Pixbuf.new_from_file_at_scale(wallpaperPath, 320, 180, true)
-    if (!thumbnail.savev(thumbnailPath, "jpeg", ["quality"], ["85"])) {
-      throw new Error(`No se pudo guardar ${thumbnailPath}`)
+    // Decode and resize through ffmpeg, which keeps the source RGB channels
+    // intact across GdkPixbuf's image loader / JPEG encoder path.
+    const filter =
+      "scale=320:180:force_original_aspect_ratio=decrease,pad=320:180:(ow-iw)/2:(oh-ih)/2,setsar=1"
+    const [ok, , , status] = GLib.spawn_sync(
+      null,
+      [
+        "ffmpeg",
+        "-v",
+        "error",
+        "-i",
+        wallpaperPath,
+        "-frames:v",
+        "1",
+        "-vf",
+        filter,
+        "-q:v",
+        "3",
+        "-y",
+        thumbnailPath,
+      ],
+      null,
+      GLib.SpawnFlags.SEARCH_PATH,
+      null,
+    )
+    if (!ok || status !== 0 || !GLib.file_test(thumbnailPath, GLib.FileTest.EXISTS)) {
+      throw new Error(`No se pudo generar una miniatura en color para ${wallpaperPath}`)
     }
     return thumbnailPath
   } catch (error) {
@@ -151,6 +187,7 @@ function ThemePreview({ theme, onSelect }: any) {
       <box
         class="wallpaper-preview-frame"
         $={(self: Gtk.Box) => {
+          self.set_size_request(320, 180)
           const picture = new Gtk.Picture()
           picture.set_can_shrink(true)
           picture.set_content_fit(Gtk.ContentFit.CONTAIN)
@@ -160,19 +197,45 @@ function ThemePreview({ theme, onSelect }: any) {
           picture.add_css_class("wallpaper-preview")
           self.append(picture)
 
+          let displayedPath: string | null = null
+          let updateIdle = 0
+
           const updatePicture = () => {
-            const path = wallpaperPath()
-            if (!path || !GLib.file_test(path, GLib.FileTest.EXISTS)) {
-              console.error(`No se encuentra el wallpaper de vista previa: ${path}`)
-              picture.set_filename(null)
-              return
-            }
-            const thumbnailPath = createWallpaperThumbnail(path)
-            picture.set_filename(thumbnailPath || null)
+            if (updateIdle) GLib.source_remove(updateIdle)
+            updateIdle = GLib.idle_add(GLib.PRIORITY_DEFAULT_IDLE, () => {
+              updateIdle = 0
+              const path = wallpaperPath()
+              if (!path || !GLib.file_test(path, GLib.FileTest.EXISTS)) {
+                picture.set_paintable(null)
+                displayedPath = null
+                return GLib.SOURCE_REMOVE
+              }
+
+              // Thumbnail generation (including ffmpeg for videos) is synchronous.
+              // Defer it until after map/layout so opening the selector doesn't
+              // stall GDK's frame clock while it is preparing the first frame.
+              const thumbnailPath = createWallpaperThumbnail(path)
+              if (wallpaperPath() !== path) return GLib.SOURCE_REMOVE
+              if (!thumbnailPath) {
+                picture.set_paintable(null)
+                displayedPath = null
+                return GLib.SOURCE_REMOVE
+              }
+
+              if (displayedPath !== thumbnailPath) {
+                picture.set_filename(thumbnailPath)
+                displayedPath = thumbnailPath
+              }
+              return GLib.SOURCE_REMOVE
+            })
           }
 
           updatePicture()
-          wallpaperPath.subscribe(updatePicture)
+          wallpaperPath.subscribe(() => {
+            picture.set_paintable(null)
+            displayedPath = null
+            updatePicture()
+          })
         }}
       />
       <box class="preview-name-box" orientation={Gtk.Orientation.VERTICAL}>
@@ -183,16 +246,10 @@ function ThemePreview({ theme, onSelect }: any) {
 }
 
 interface ThemeSelectorWindowProps {
-  visible: boolean
   onClose: () => void
-  onVisibilityChange: (visible: boolean) => void
 }
 
-function ThemeSelectorWindow({
-  visible,
-  onClose,
-  onVisibilityChange,
-}: ThemeSelectorWindowProps) {
+function ThemeSelectorWindow({ onClose }: ThemeSelectorWindowProps) {
   const [selectedThemeGetter, selectedThemeSetter] = createState<string | null>(
     null,
   )
@@ -209,6 +266,22 @@ function ThemeSelectorWindow({
 
   const refreshThemes = () => {
     const refreshedThemes = loadThemes()
+    const currentThemes = themes()
+    const unchanged =
+      currentThemes.length === refreshedThemes.length &&
+      currentThemes.every((theme, index) => {
+        const refreshed = refreshedThemes[index]
+        return (
+          theme.id === refreshed.id &&
+          theme.name === refreshed.name &&
+          theme.desc === refreshed.desc &&
+          theme.color === refreshed.color &&
+          theme.wallpaper === refreshed.wallpaper &&
+          theme.path === refreshed.path
+        )
+      })
+
+    if (unchanged) return
     themesSetter(refreshedThemes)
     if (refreshedThemes.length === 0) {
       indexSetter(0)
@@ -230,30 +303,7 @@ function ThemeSelectorWindow({
       const [ok, content] = GLib.file_get_contents(sourcePath)
       if (ok) {
         GLib.file_set_contents(targetPath, content)
-        if (RUN_THEME_SCRIPTS) {
-          try {
-            await execAsync([
-              "bash",
-              `${AGS_DIR}/src/services/theme_scripts/update-hyprland-borders.sh`,
-            ])
-          } catch (error) {
-            console.error("Error actualizando los bordes de Hyprland:", error)
-          }
-        }
-        const debugLog = `${GLib.getenv("XDG_RUNTIME_DIR") || "/tmp"}/ags-theme-debug.log`
-        try {
-          const existing = GLib.file_get_contents(debugLog)[1]
-          const existingContent = existing ? new TextDecoder().decode(existing) : ""
-          GLib.file_set_contents(
-            debugLog,
-            existingContent + `[${new Date().toISOString()}] AGS_WRITE: ${themeId} -> theme.json\n`,
-          )
-        } catch (e) {
-          GLib.file_set_contents(
-            debugLog,
-            `[${new Date().toISOString()}] AGS_WRITE: ${themeId} -> theme.json\n`,
-          )
-        }
+        await runThemeScripts()
       }
     } catch (e) {
       console.error("Error aplicando tema:", e)
@@ -294,24 +344,11 @@ function ThemeSelectorWindow({
   return (
     <window
       name="theme-selector"
-      visible={visible}
+      visible={false}
       anchor={Astal.WindowAnchor.CENTER}
       layer={Astal.Layer.OVERLAY}
       application={app}
       keymode={Astal.Keymode.EXCLUSIVE}
-      $={(self: any) => {
-        self.connect("notify::visible", () => {
-          const isVisible = self.get_visible()
-          onVisibilityChange(isVisible)
-          if (isVisible) {
-            refreshThemes()
-            GLib.idle_add(GLib.PRIORITY_DEFAULT, () => {
-              rootWidget?.grab_focus()
-              return GLib.SOURCE_REMOVE
-            })
-          }
-        })
-      }}
     >
       <box
         class="theme-selector-window"
@@ -342,7 +379,13 @@ function ThemeSelectorWindow({
             return false
           })
           self.add_controller(keys)
-          self.connect("map", () => self.grab_focus())
+          self.connect("map", () => {
+            GLib.idle_add(GLib.PRIORITY_DEFAULT_IDLE, () => {
+              refreshThemes()
+              self.grab_focus()
+              return GLib.SOURCE_REMOVE
+            })
+          })
         }}
       >
         <box class="preview-container" orientation={Gtk.Orientation.HORIZONTAL} spacing={10}>
@@ -386,22 +429,28 @@ function ThemeSelectorWindow({
 }
 
 export function getThemeSelector() {
-  const [visibleGetter, visibleSetter] = createState(false)
-  const visible = createComputed(() => visibleGetter())
+  let selectorWindow: any = null
 
   const window = (
     <ThemeSelectorWindow
-      visible={visible}
-      onClose={() => visibleSetter(false)}
-      onVisibilityChange={(isVisible) => visibleSetter(isVisible)}
+      onClose={() => {
+        if (selectorWindow) selectorWindow.visible = false
+      }}
     />
   )
+  selectorWindow = window
 
   return {
     window,
-    toggle: () => visibleSetter((v) => !v),
-    show: () => visibleSetter(true),
-    hide: () => visibleSetter(false),
+    toggle: () => {
+      selectorWindow.visible = !selectorWindow.visible
+    },
+    show: () => {
+      selectorWindow.visible = true
+    },
+    hide: () => {
+      selectorWindow.visible = false
+    },
   }
 }
 

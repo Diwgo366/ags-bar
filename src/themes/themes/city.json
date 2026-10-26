@@ -1,0 +1,30 @@
+{
+  "name": "city",
+  "icons": "Papirus",
+  "font": {
+    "family": "CaskaydiaMono Nerd Font",
+    "size": 13
+  },
+  "wallpaper": "/home/diego/Media/Imágenes/wallpapers/city.png",
+  "colors": {
+    "bg": "#202638",
+    "bgAlt": "#151A29",
+    "fg": "#F8F0F5",
+    "fgAlt": "#C0B4C2",
+    "accent": "#F04F9B",
+    "bd": "#4B405B",
+    "bdAlt": "#F8F0F5",
+    "red": "#FF4F68",
+    "green": "#43C982",
+    "yellow": "#FFC857",
+    "blue": "#4E83FF",
+    "magenta": "#DF49C0",
+    "cyan": "#24C6CF",
+    "red_s": "#FF7184",
+    "green_s": "#65E29B",
+    "yellow_s": "#FFDA79",
+    "blue_s": "#77A0FF",
+    "magenta_s": "#F36BD7",
+    "cyan_s": "#4DDFE3"
+  }
+}
