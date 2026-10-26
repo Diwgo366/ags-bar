@@ -9,6 +9,11 @@ const reloadTimers = new Map()
 let monitor = null
 let privateConfigModule = null
 
+function loadPrivateConfig() {
+  const path = `${CONFIG_DIR}/privateConfig.js`
+  return import(GLib.filename_to_uri(path, null))
+}
+
 export function onConfigChange(callback) {
   listeners.add(callback)
   return () => listeners.delete(callback)
@@ -106,7 +111,7 @@ async function reloadPrivateConfig() {
   else calendarUrl = match[1].slice(1, -1).replace(/\\'/g, "'").replace(/\\\\/g, "\\")
 
   if (!privateConfigModule) {
-    privateConfigModule = await import("../config/privateConfig.js")
+    privateConfigModule = await loadPrivateConfig()
   }
   privateConfigModule.applyPrivateConfig({ calendarUrl })
   notify("privateConfig", { calendarUrl })
@@ -130,7 +135,7 @@ function scheduleReload(name) {
 export async function watchConfigFiles() {
   if (monitor) return
 
-  privateConfigModule = await import("../config/privateConfig.js")
+  privateConfigModule = await loadPrivateConfig()
   const directory = Gio.File.new_for_path(CONFIG_DIR)
   monitor = directory.monitor_directory(Gio.FileMonitorFlags.WATCH_MOVES, null)
   monitor.connect("changed", (_monitor, file, otherFile) => {

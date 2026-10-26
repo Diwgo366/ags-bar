@@ -1,7 +1,7 @@
 {
   "name": "yveltal",
   "icons": "Papirus",
-  "wallpaper": "/home/diego/Media/Imágenes/wallpapers/yveltal.png",
+  "wallpaper": "Media/Imágenes/wallpapers/yveltal.png",
   "colors": {
     "bg": "#292B29",
     "bgAlt": "#191B19",

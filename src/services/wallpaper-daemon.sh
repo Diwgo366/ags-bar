@@ -173,6 +173,10 @@ apply_wallpaper() {
         return
     fi
 
+    if [[ "$wallpaper" != /* ]]; then
+        wallpaper="${HOME:-$(getent passwd "$(id -u)" | cut -d: -f6)}/$wallpaper"
+    fi
+
     if [[ ! -f "$wallpaper" ]]; then
         log "Wallpaper not found: '$wallpaper'"
         stop_wallpapers

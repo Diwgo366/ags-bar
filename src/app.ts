@@ -27,7 +27,10 @@ if (!GLib.file_test(privateConfigPath, GLib.FileTest.EXISTS)) {
   ].join("\n")
   GLib.file_set_contents(privateConfigPath, content)
 }
-const { privateConfig } = await import("./config/privateConfig.js")
+// Keep this as a runtime import: AGS bundles this entry before executing it,
+// so the generated, git-ignored file does not exist during bundle resolution.
+const privateConfigUri = GLib.filename_to_uri(privateConfigPath, null)
+const { privateConfig } = await import(privateConfigUri)
 
 const activeThemePath = AGS_DIR + "/src/themes/theme.json"
 if (!GLib.file_test(activeThemePath, GLib.FileTest.EXISTS)) {

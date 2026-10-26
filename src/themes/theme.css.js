@@ -70,12 +70,22 @@ function generateCSS() {
 @define-color magenta ${c.magenta};
 @define-color cyan ${c.cyan};
 
-window, label, box {
+/*
+ * Reset de todos los nodos usados en la barra y sus ventanas.
+ * Si un tipo de widget no aparece aquí, GTK le aplica los fondos, bordes y
+ * sombras del tema del sistema (por ejemplo Tokyonight), y esos colores no
+ * salen de theme.json. Añade aquí cualquier widget nuevo antes de darle estilo.
+ */
+window, label, box, centerbox, overlay, image, button, menubutton,
+togglebutton, popover, tooltip {
   font-family: "${t.font.family ?? "Arial"}";
   font-size: ${t.font.size ?? 13}px;
   background-color: transparent;
+  background-image: none;
   border: 0;
   border-color: transparent;
+  box-shadow: none;
+  outline: none;
   background-clip: padding-box;
   margin: 0;
   padding: 0;
@@ -142,9 +152,33 @@ label {
   min-width: 65px;
 }
 
+.powermenu button {
+  min-width: 34px;
+  min-height: 34px;
+  border-radius: ${innerRounding}px;
+  color: @fg;
+}
+
+.powermenu button:hover {
+  background-color: @bg-alt;
+}
+
+tooltip {
+  background-color: @bg;
+  border: ${border_wd}px solid @bd;
+  border-radius: ${rounding}px;
+  box-shadow: none;
+  padding: 0;
+}
+
+tooltip label {
+  color: @fg;
+  padding: 4px 8px;
+}
+
 popover > arrow { border: 2px solid @bd-alt; background-color: @bg; }
 popover > contents { border: 2px solid @bd-alt; background-color: @bg; padding: 10px; }
-popover button { border: 2px solid @bd; padding: 5px 15px; margin: 5px; border-radius: ${rounding}px; }
+popover button { background-color: transparent; border: 2px solid @bd; padding: 5px 15px; margin: 5px; border-radius: ${rounding}px; }
 popover button:hover, popover button:checked { border-color: @accent; background-color: @accent; color: @bg; }
 
 .overlay-content {

@@ -5,7 +5,7 @@
     "family": "CaskaydiaMono Nerd Font",
     "size": 13
   },
-  "wallpaper": "/home/diego/Media/Imágenes/wallpapers/city.png",
+  "wallpaper": "Media/Imágenes/wallpapers/city.png",
   "colors": {
     "bg": "#202638",
     "bgAlt": "#151A29",

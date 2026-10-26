@@ -59,12 +59,10 @@ function loadThemes(): Theme[] {
   return themes
 }
 
-const WALLPAPER_DIR = `${GLib.get_home_dir()}/Media/Imágenes/Wallpapers`
-
 function getWallpaperPath(wallpaperPath: string): string {
   if (!wallpaperPath) return ""
   if (wallpaperPath.startsWith("/")) return wallpaperPath
-  return `${WALLPAPER_DIR}/${wallpaperPath}`
+  return `${GLib.get_home_dir()}/${wallpaperPath}`
 }
 
 function createWallpaperThumbnail(wallpaperPath: string): string {

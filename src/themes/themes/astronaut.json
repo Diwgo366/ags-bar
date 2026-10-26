@@ -5,7 +5,7 @@
     "family": "CaskaydiaMono Nerd Font",
     "size": 13
   },
-  "wallpaper": "/home/diego/Media/Imágenes/wallpapers/astronaut.png",
+  "wallpaper": "Media/Imágenes/wallpapers/astronaut.png",
   "colors": {
     "bg": "#1C2435",
     "bgAlt": "#111827",
