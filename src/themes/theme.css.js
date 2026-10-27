@@ -73,7 +73,7 @@ function generateCSS() {
 /*
  * Reset de todos los nodos usados en la barra y sus ventanas.
  * Si un tipo de widget no aparece aquí, GTK le aplica los fondos, bordes y
- * sombras del tema del sistema (por ejemplo Tokyonight), y esos colores no
+ * sombras del tema del sistema , y esos colores no
  * salen de theme.json. Añade aquí cualquier widget nuevo antes de darle estilo.
  */
 window, label, box, centerbox, overlay, image, button, menubutton,
