@@ -1,7 +1,7 @@
 {
   "name": "default",
   "icons": "Papirus",
-  "wallpaper": "",
+  "wallpaper": "Media/Imágenes/wallpapers/default.png",
   "colors": {
     "bg": "#282a36",
     "bgAlt": "#191a21",
