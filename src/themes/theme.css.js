@@ -91,6 +91,13 @@ togglebutton, popover, tooltip {
   padding: 0;
 }
 
+/* GTK asigna el fondo de algunas ventanas al nodo window.background. */
+window.background {
+  background-color: transparent;
+  background-image: none;
+  box-shadow: none;
+}
+
 window {
   margin: ${gaps}px;
   margin-bottom: 0;
@@ -354,7 +361,9 @@ export function applyTheme() {
   Gtk.StyleContext.add_provider_for_display(
     display,
     cssProvider,
-    Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION,
+    // ~/.config/gtk-4.0/gtk.css (incluido el CSS del tema instalado) usa
+    // prioridad USER y puede imponerse al CSS de la aplicación.
+    Gtk.STYLE_PROVIDER_PRIORITY_USER + 1,
   )
 
   for (const callback of themeChangeListeners) {
