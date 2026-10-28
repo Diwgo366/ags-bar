@@ -218,7 +218,7 @@ popover button:hover, popover button:checked { border-color: @accent; background
 .cal-hour-label { color: @fg-alt; font-size: 10px; }
 .cal-now-line { min-height: 1px; background-color: @accent; }
 .cal-cell { background-color: alpha(${c.bd}, 0.1); border-bottom: 1px solid alpha(${c.bd}, 0.2); border-right: 1px solid alpha(${c.bd}, 0.2); padding: 0; }
-.cal-event { border-radius: 4px; border-left: 0; padding: 0 5px; }
+.cal-event { border-radius: 4px; border-left: 3px solid transparent; padding: 0 5px; }
 .cal-event-time, .cal-event-title, .cal-event-salon { color: @fg; }
 .cal-week-nav { background: transparent; border: 0; color: @accent; font-size: 24px; min-width: 28px; min-height: 28px; }
 .cal-week-nav:hover { background-color: @bg-alt; }
@@ -309,7 +309,10 @@ function watchThemeFile() {
 }
 
 export function registerCalendarStyle(cssClass, background, border) {
-  calendarStyles += `.${cssClass} { background-color: alpha(${background}, 0.85); border-left-color: ${border}; }\n`
+  // The event also has .cal-cell, whose base background is defined by the
+  // main provider. Match that selector and add the course class so this rule
+  // wins without raising the dynamic provider above the app's base CSS.
+  calendarStyles += `.cal-cell.${cssClass} { background-color: alpha(${background}, 0.85); border-left-color: ${border}; }\n`
 
   if (!calendarStyleProvider) {
     calendarStyleProvider = new Gtk.CssProvider()
@@ -318,7 +321,7 @@ export function registerCalendarStyle(cssClass, background, border) {
       Gtk.StyleContext.add_provider_for_display(
         display,
         calendarStyleProvider,
-        Gtk.STYLE_PROVIDER_PRIORITY_USER,
+        Gtk.STYLE_PROVIDER_PRIORITY_USER + 1,
       )
     }
   }
