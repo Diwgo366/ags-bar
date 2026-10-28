@@ -25,7 +25,7 @@ function hashString(str: string) {
 
 const courseColorCache: Record<
   string,
-  { bg: string; border: string; cssClass: string }
+  { bg: string; cssClass: string }
 > = {}
 const registeredCourses = new Set<string>()
 
@@ -62,13 +62,9 @@ function getCourseColors(summary: string) {
       Object.keys(courseColorCache).length % themeColorNames.length
     ]
   const bg = colors[colorName]
-  const baseColorName = colorName.endsWith("_s")
-    ? colorName.slice(0, -2)
-    : colorName
-  const border = colors[`${baseColorName}_s`]
   const cssClass = `cal-course-${hashString(name)}`
 
-  courseColorCache[name] = { bg, border, cssClass }
+  courseColorCache[name] = { bg, cssClass }
   return courseColorCache[name]
 }
 
@@ -77,7 +73,7 @@ function registerCourseStyle(courseName: string) {
   registeredCourses.add(courseName)
 
   const colors = getCourseColors(courseName)
-  registerCalendarStyle(colors.cssClass, colors.bg, colors.border)
+  registerCalendarStyle(colors.cssClass, colors.bg)
 }
 
 function extractSalon(description: string, location: string) {
