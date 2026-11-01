@@ -1,9 +1,20 @@
 import Soup from "gi://Soup?version=3.0"
 import GLib from "gi://GLib"
+import Gio from "gi://Gio"
+import { INTERVAL } from "../../config/appConfig.js"
 
 const session = new Soup.Session()
+session.timeout = 15
 
 const DAY_MAP = { SU: 0, MO: 1, TU: 2, WE: 3, TH: 4, FR: 5, SA: 6 }
+
+const sourceCache = new Map()
+const inflightRequests = new Map()
+
+export function clearCalendarCache() {
+  sourceCache.clear()
+  inflightRequests.clear()
+}
 
 function decodeICalString(str) {
   if (!str) return ""
@@ -55,10 +66,16 @@ function parseICalDate(dateStr, keyPart = "") {
           second: "numeric",
           hourCycle: "h23",
         }).formatToParts(local)
-        const values = Object.fromEntries(parts.map((part) => [part.type, part.value]))
+        const values = Object.fromEntries(
+          parts.map((part) => [part.type, part.value]),
+        )
         const zonedAsLocal = new Date(
-          Number(values.year), Number(values.month) - 1, Number(values.day),
-          Number(values.hour), Number(values.minute), Number(values.second),
+          Number(values.year),
+          Number(values.month) - 1,
+          Number(values.day),
+          Number(values.hour),
+          Number(values.minute),
+          Number(values.second),
         )
         const correction = local.getTime() - zonedAsLocal.getTime()
         return new Date(local.getTime() + correction)
@@ -148,7 +165,9 @@ function expandRRule(event, rrule, weekStart, weekEnd) {
         firstPossible.setDate(firstPossible.getDate() + 7 * interval)
       }
 
-      const diffWeeks = Math.floor((firstPossible.getTime() - baseTime) / (7 * 86400000))
+      const diffWeeks = Math.floor(
+        (firstPossible.getTime() - baseTime) / (7 * 86400000),
+      )
       if (diffWeeks < 0) continue
       if (diffWeeks % interval !== 0) {
         const adjust = ((interval - (diffWeeks % interval)) % interval) * 7
@@ -162,7 +181,9 @@ function expandRRule(event, rrule, weekStart, weekEnd) {
       ) {
         if (rrule.until && occ > rrule.until) break
         if (rrule.count) {
-          const occIndex = Math.floor((occ.getTime() - baseTime) / (7 * 86400000 * interval))
+          const occIndex = Math.floor(
+            (occ.getTime() - baseTime) / (7 * 86400000 * interval),
+          )
           if (occIndex >= rrule.count) break
         }
 
@@ -222,6 +243,9 @@ function parseICalContent(content) {
           break
         case "RRULE":
           currentEvent.rrule = parseRRule(value)
+          break
+        case "UID":
+          currentEvent.uid = decodeICalString(value).trim()
           break
       }
     }
@@ -295,17 +319,42 @@ function dateKey(date) {
   return `${y}-${m}-${d}`
 }
 
-export function fetchWeekEvents(icalUrl, referenceDate = new Date()) {
+function sanitizeErrorMessage(error, status) {
+  if (status && status !== 200) {
+    return `HTTP ${status}`
+  }
+  if (error) {
+    if (error.message === "Calendario no válido") {
+      return "Calendario no válido"
+    }
+    if (
+      (error.matches &&
+        error.matches(Gio.io_error_quark(), Gio.IOErrorEnum.TIMED_OUT)) ||
+      /time.*out|agotado/i.test(error.message || "")
+    ) {
+      return "Tiempo de espera agotado"
+    }
+  }
+  return "No se pudo conectar"
+}
+
+function loadSource(source) {
   return new Promise((resolve, reject) => {
-    const url = typeof icalUrl === "string" ? icalUrl.trim() : ""
+    const url = typeof source?.url === "string" ? source.url.trim() : ""
     if (!url) {
-      reject(new Error("Configura calendarUrl en src/config/privateConfig.js"))
+      reject(new Error("Calendario no válido"))
       return
     }
 
-    const msg = Soup.Message.new("GET", url)
+    let msg = null
+    try {
+      msg = Soup.Message.new("GET", url)
+    } catch {
+      // Soup.Message.new may throw on invalid URL
+    }
+
     if (!msg) {
-      reject(new Error("La URL del calendario no es válida"))
+      reject(new Error("Calendario no válido"))
       return
     }
 
@@ -319,57 +368,212 @@ export function fetchWeekEvents(icalUrl, referenceDate = new Date()) {
           const status = msg.get_status()
 
           if (status !== 200) {
-            reject(new Error(`HTTP ${status}`))
+            const err = new Error(`HTTP ${status}`)
+            err.status = status
+            reject(err)
             return
           }
 
           const content = new TextDecoder().decode(bytes.get_data())
           const rawEvents = parseICalContent(content)
-
-          const { start: weekStart, end: weekEnd } = getWeekRange(referenceDate)
-
-          const allEvents = expandEvents(rawEvents, weekStart, weekEnd)
-
-          const weekEvents = allEvents
-            .filter((e) => isEventInWeek(e, weekStart, weekEnd))
-            .sort((a, b) => (a.start || 0) - (b.start || 0))
-
-          const dayNames = ["Dom", "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"]
-          const grouped = []
-          const todayKey = dateKey(new Date())
-
-          for (let i = 0; i < 7; i++) {
-            const day = new Date(weekStart)
-            day.setDate(weekStart.getDate() + i)
-            const key = dateKey(day)
-
-            const dayEvents = weekEvents.filter((e) => {
-              if (!e.start) return false
-              return dateKey(e.start) === key
-            })
-
-            grouped.push({
-              name: dayNames[day.getDay()],
-              date: day.getDate(),
-              month: day.getMonth(),
-              isToday: key === todayKey,
-              events: dayEvents.map((e) => ({
-                summary: e.summary || "(Sin título)",
-                startTime: formatTime(e.start),
-                endTime: formatTime(e.end),
-                location: e.location || "",
-                _rawDescription: e.description || "",
-                _rawStart: e.start ? e.start.toISOString() : null,
-                _rawEnd: e.end ? e.end.toISOString() : null,
-              })),
-            })
+          for (const ev of rawEvents) {
+            ev.sourceId = source.id
+            ev.sourceName = source.name
+            ev.sourceOrder = source.order
+            ev.uid = ev.uid ? String(ev.uid).trim() : ""
           }
-
-          resolve(grouped)
+          resolve(rawEvents)
         } catch (e) {
-          reject(e)
+          const status = msg.get_status()
+          const err = new Error(sanitizeErrorMessage(e, status))
+          err.status = status
+          reject(err)
         }
       },
     )
   })
+}
+
+function getOrFetchSource(source) {
+  const cached = sourceCache.get(source.id)
+  const now = Date.now()
+  const ttl =
+    INTERVAL && typeof INTERVAL.CALENDAR === "number"
+      ? INTERVAL.CALENDAR
+      : 300000
+
+  if (cached && now - cached.fetchedAt < ttl) {
+    return Promise.resolve({
+      rawEvents: cached.rawEvents,
+      stale: false,
+      error: null,
+    })
+  }
+
+  if (inflightRequests.has(source.id)) {
+    return inflightRequests.get(source.id)
+  }
+
+  const promise = loadSource(source)
+    .then((rawEvents) => {
+      sourceCache.set(source.id, { rawEvents, fetchedAt: Date.now() })
+      inflightRequests.delete(source.id)
+      return { rawEvents, stale: false, error: null }
+    })
+    .catch((err) => {
+      inflightRequests.delete(source.id)
+      if (cached) {
+        return {
+          rawEvents: cached.rawEvents,
+          stale: true,
+          error: err,
+        }
+      }
+      throw err
+    })
+
+  inflightRequests.set(source.id, promise)
+  return promise
+}
+
+function deduplicateEvents(events) {
+  const seenByUidAndTime = new Set()
+  const result = []
+
+  for (const event of events) {
+    if (!event.uid || !event.start) {
+      result.push(event)
+      continue
+    }
+    const key = `${event.uid}|${event.start.getTime()}`
+    if (seenByUidAndTime.has(key)) {
+      continue
+    }
+    seenByUidAndTime.add(key)
+    result.push(event)
+  }
+
+  return result
+}
+
+function groupEventsByDay(weekEvents, weekStart) {
+  const dayNames = ["Dom", "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"]
+  const grouped = []
+  const todayKey = dateKey(new Date())
+
+  for (let i = 0; i < 7; i++) {
+    const day = new Date(weekStart)
+    day.setDate(weekStart.getDate() + i)
+    const key = dateKey(day)
+
+    const dayEvents = weekEvents.filter((e) => {
+      if (!e.start) return false
+      return dateKey(e.start) === key
+    })
+
+    grouped.push({
+      name: dayNames[day.getDay()],
+      date: day.getDate(),
+      month: day.getMonth(),
+      isToday: key === todayKey,
+      events: dayEvents.map((e) => ({
+        summary: e.summary || "(Sin título)",
+        startTime: formatTime(e.start),
+        endTime: formatTime(e.end),
+        location: e.location || "",
+        _rawDescription: e.description || "",
+        _rawStart: e.start ? e.start.toISOString() : null,
+        _rawEnd: e.end ? e.end.toISOString() : null,
+        sourceId: e.sourceId || "",
+        sourceName: e.sourceName || "",
+        sourceOrder: e.sourceOrder ?? 0,
+        uid: e.uid || "",
+      })),
+    })
+  }
+
+  return grouped
+}
+
+function createEmptyWeek(referenceDate = new Date()) {
+  const { start: weekStart } = getWeekRange(referenceDate)
+  return groupEventsByDay([], weekStart)
+}
+
+export async function fetchWeekEvents(
+  sources = [],
+  referenceDate = new Date(),
+) {
+  if (!Array.isArray(sources) || sources.length === 0) {
+    return {
+      days: createEmptyWeek(referenceDate),
+      errors: [],
+      okCount: 0,
+    }
+  }
+
+  const activeIds = new Set(sources.map((s) => s.id))
+  for (const id of sourceCache.keys()) {
+    if (!activeIds.has(id)) sourceCache.delete(id)
+  }
+  for (const id of inflightRequests.keys()) {
+    if (!activeIds.has(id)) inflightRequests.delete(id)
+  }
+
+  const settled = await Promise.allSettled(
+    sources.map((source) => getOrFetchSource(source)),
+  )
+
+  const errors = []
+  let okCount = 0
+  const allRawEvents = []
+
+  for (let i = 0; i < sources.length; i++) {
+    const source = sources[i]
+    const res = settled[i]
+
+    if (res.status === "fulfilled") {
+      const { rawEvents, stale, error } = res.value
+      okCount++
+      allRawEvents.push(...rawEvents)
+      if (stale && error) {
+        const message = sanitizeErrorMessage(error, error.status)
+        errors.push({
+          sourceId: source.id,
+          name: source.name,
+          message,
+          stale: true,
+        })
+      }
+    } else {
+      const err = res.reason
+      const message = sanitizeErrorMessage(err, err?.status)
+      errors.push({
+        sourceId: source.id,
+        name: source.name,
+        message,
+        stale: false,
+      })
+    }
+  }
+
+  const { start: weekStart, end: weekEnd } = getWeekRange(referenceDate)
+  const allExpanded = expandEvents(allRawEvents, weekStart, weekEnd)
+
+  const weekEvents = allExpanded
+    .filter((e) => isEventInWeek(e, weekStart, weekEnd))
+    .sort(
+      (a, b) =>
+        (a.start || 0) - (b.start || 0) ||
+        (a.sourceOrder ?? 0) - (b.sourceOrder ?? 0),
+    )
+
+  const deduplicatedEvents = deduplicateEvents(weekEvents)
+  const days = groupEventsByDay(deduplicatedEvents, weekStart)
+
+  return {
+    days,
+    errors,
+    okCount,
+  }
 }

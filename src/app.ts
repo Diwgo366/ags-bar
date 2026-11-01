@@ -10,15 +10,15 @@ import { applyTheme } from "./themes/theme.css.js"
 import { AGS_DIR } from "./config/appConfig.js"
 import { runThemeScripts } from "./services/themeScripts.js"
 import { onConfigChange, watchConfigFiles } from "./services/configWatcher.js"
+import { normalizeCalendarSources } from "./services/calendar/calendarSources.js"
 
 const privateConfigPath = AGS_DIR + "/src/config/privateConfig.js"
 if (!GLib.file_test(privateConfigPath, GLib.FileTest.EXISTS)) {
   const content = [
-    "// Auto-generado - edita este archivo directamente",
-    "// Se regenera con valores por defecto si lo borras",
-    "",
     "export let privateConfig = {",
-    '  calendarUrl: "",',
+    "  calendars: [",
+    '    // { name: "Mi calendario", url: "https://calendar.google.com/calendar/ical/.../basic.ics", color: "blue" },',
+    "  ],",
     "};",
     "export function applyPrivateConfig(updated) {",
     "  privateConfig = { ...privateConfig, ...updated };",
@@ -51,7 +51,10 @@ app.start({
   main() {
     // Keep wallpaper updates available regardless of which Hyprland script
     // started AGS. The daemon's lock makes a manually started copy harmless.
-    void execAsync(["bash", AGS_DIR + "/src/services/wallpaper-daemon.sh"]).catch((error) =>
+    void execAsync([
+      "bash",
+      AGS_DIR + "/src/services/wallpaper-daemon.sh",
+    ]).catch((error) =>
       console.error("No se pudo iniciar wallpaper-daemon:", error),
     )
 
@@ -62,20 +65,16 @@ app.start({
     const windows = primaryMonitor ? [Bar(primaryMonitor)] : []
 
     const overlay = Overlay()
-    configureCalendarPopup(privateConfig.calendarUrl)
+    configureCalendarPopup(normalizeCalendarSources(privateConfig))
     void watchConfigFiles().catch((error) =>
       console.error("No se pudo iniciar el vigilante de configuración:", error),
     )
     onConfigChange((name, value) => {
-      if (name === "privateConfig") configureCalendarPopup(value.calendarUrl)
+      if (name === "privateConfig") configureCalendarPopup(value.sources)
     })
     const themeSelector = ThemeSelector()
 
-    return [
-      ...windows,
-      overlay.window,
-      themeSelector.window,
-    ]
+    return [...windows, overlay.window, themeSelector.window]
   },
   requestHandler(args, response) {
     if (!args.length) return

@@ -1,10 +1,6 @@
 import { Gtk } from "ags/gtk4"
 import GLib from "gi://GLib"
-import {
-  CALENDAR,
-  INTERVAL,
-  LOCALE,
-} from "../config/appConfig.js"
+import { CALENDAR, INTERVAL, LOCALE } from "../config/appConfig.js"
 import { fetchWeekEvents } from "../services/calendar/icalParser.js"
 import { onConfigChange } from "../services/configWatcher.js"
 import {
@@ -13,6 +9,14 @@ import {
   onThemeChange,
   registerCalendarStyle,
 } from "../themes/theme.css.js"
+
+export type Source = {
+  id: string
+  name: string
+  url: string
+  color: string | null
+  order: number
+}
 
 function hashString(str: string) {
   let hash = 0
@@ -23,10 +27,7 @@ function hashString(str: string) {
   return Math.abs(hash)
 }
 
-const courseColorCache: Record<
-  string,
-  { bg: string; cssClass: string }
-> = {}
+const courseColorCache: Record<string, { bg: string; cssClass: string }> = {}
 const registeredCourses = new Set<string>()
 
 function clearCourseColorCache() {
@@ -52,27 +53,41 @@ const themeColorNames = [
   "cyan_s",
 ] as const
 
-function getCourseColors(summary: string) {
-  const name = summary.trim()
-  if (courseColorCache[name]) return courseColorCache[name]
+function getCourseColors(summary: string, source?: Source | null) {
+  const sourceId = source?.id ?? ""
+  const key = `${sourceId}|${summary.trim()}`
+  if (courseColorCache[key]) return courseColorCache[key]
 
   const colors = getThemeColors()
-  const colorName =
-    themeColorNames[
-      Object.keys(courseColorCache).length % themeColorNames.length
-    ]
-  const bg = colors[colorName]
-  const cssClass = `cal-course-${hashString(name)}`
+  let bg: string | null = null
 
-  courseColorCache[name] = { bg, cssClass }
-  return courseColorCache[name]
+  if (source?.color) {
+    if (/^#[0-9a-fA-F]{6}$/.test(source.color)) {
+      bg = source.color
+    } else if (colors && colors[source.color]) {
+      bg = colors[source.color]
+    }
+  }
+
+  if (!bg) {
+    const colorName =
+      themeColorNames[
+        Object.keys(courseColorCache).length % themeColorNames.length
+      ]
+    bg = colors[colorName]
+  }
+
+  const cssClass = `cal-course-${hashString(key)}`
+  courseColorCache[key] = { bg, cssClass }
+  return courseColorCache[key]
 }
 
-function registerCourseStyle(courseName: string) {
-  if (registeredCourses.has(courseName)) return
-  registeredCourses.add(courseName)
-
-  const colors = getCourseColors(courseName)
+function registerCourseStyle(
+  key: string,
+  colors: { bg: string; cssClass: string },
+) {
+  if (registeredCourses.has(key)) return
+  registeredCourses.add(key)
   registerCalendarStyle(colors.cssClass, colors.bg)
 }
 
@@ -134,6 +149,13 @@ function createCalendarGrid() {
     css_classes: ["cal-header"],
   })
   headerBox.append(titleLabel)
+
+  const warningLabel = new Gtk.Label({
+    label: "⚠",
+    css_classes: ["cal-warning"],
+    visible: false,
+  })
+  headerBox.append(warningLabel)
 
   const nextWeek = new Gtk.Button({
     label: "›",
@@ -223,15 +245,19 @@ function createCalendarGrid() {
     for (let d = 0; d < CALENDAR.NUM_DAYS; d++) {
       const date = new Date(monday)
       date.setDate(monday.getDate() + d)
-      const dayName = ["Dom", "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"][date.getDay()]
-      const dayStr = date.toLocaleDateString(LOCALE, { day: "2-digit", month: "2-digit" })
-      const isToday = weekOffset.value === 0 && date.toDateString() === now.toDateString()
+      const dayName = ["Dom", "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"][
+        date.getDay()
+      ]
+      const dayStr = date.toLocaleDateString(LOCALE, {
+        day: "2-digit",
+        month: "2-digit",
+      })
+      const isToday =
+        weekOffset.value === 0 && date.toDateString() === now.toDateString()
       const lbl = new Gtk.Label({
         label: `${dayName} ${dayStr}`,
         hexpand: true,
-        css_classes: isToday
-          ? ["cal-day-header", "today"]
-          : ["cal-day-header"],
+        css_classes: isToday ? ["cal-day-header", "today"] : ["cal-day-header"],
       })
       grid.attach(lbl, d + 1, 0, 1, 1)
     }
@@ -249,7 +275,7 @@ function createCalendarGrid() {
       })
       grid.attach(hourLabel, 0, h + 1, 1, 1)
 
-for (let d = 0; d < CALENDAR.NUM_DAYS; d++) {
+      for (let d = 0; d < CALENDAR.NUM_DAYS; d++) {
         const empty = new Gtk.Box({
           css_classes: ["cal-cell"],
           hexpand: true,
@@ -262,9 +288,9 @@ for (let d = 0; d < CALENDAR.NUM_DAYS; d++) {
     if (weekOffset.value === 0) updateNowLine()
     else nowLine.set_visible(false)
     queueNowLineUpdate()
-    }
+  }
 
-  function renderEvents(grouped: any[]) {
+  function renderEvents(grouped: any[], currentSources: Source[] = []) {
     const occupied: Record<string, boolean> = {}
 
     const hours = CALENDAR.END_HOUR - CALENDAR.START_HOUR
@@ -285,8 +311,10 @@ for (let d = 0; d < CALENDAR.NUM_DAYS; d++) {
         const event = eventsByHour[d]?.get(hour)
 
         if (event) {
-          const colors = getCourseColors(event.summary)
-          registerCourseStyle(event.summary)
+          const source = currentSources.find((s) => s.id === event.sourceId)
+          const colors = getCourseColors(event.summary, source)
+          const colorKey = `${event.sourceId || ""}|${event.summary.trim()}`
+          registerCourseStyle(colorKey, colors)
           const span = Math.min(event.duration || 1, hours - h)
 
           const eventBox = new Gtk.Box({
@@ -296,6 +324,13 @@ for (let d = 0; d < CALENDAR.NUM_DAYS; d++) {
             vexpand: true,
           })
           eventBox.set_size_request(120, span * CALENDAR.HOUR_HEIGHT)
+
+          const timeLine = event.endTime
+            ? `\n${event.startTime} - ${event.endTime}`
+            : ""
+          eventBox.set_tooltip_text(
+            `${event.sourceName}\n${event.summary}${timeLine}`,
+          )
 
           const titleLbl = new Gtk.Label({
             label: event.summary,
@@ -343,6 +378,7 @@ for (let d = 0; d < CALENDAR.NUM_DAYS; d++) {
   }
 
   function showLoading() {
+    setWarning([])
     clearChildren(grid)
     const loading = new Gtk.Label({
       label: "Cargando eventos...",
@@ -353,6 +389,7 @@ for (let d = 0; d < CALENDAR.NUM_DAYS; d++) {
   }
 
   function showError(msg: string) {
+    setWarning([])
     clearChildren(grid)
     const error = new Gtk.Label({
       label: `Error: ${String(msg || "No se pudo cargar el calendario")}`,
@@ -360,6 +397,28 @@ for (let d = 0; d < CALENDAR.NUM_DAYS; d++) {
       margin_bottom: 20,
     })
     grid.attach(error, 0, 0, CALENDAR.NUM_DAYS + 1, 1)
+  }
+
+  function setWarning(
+    errors: Array<{
+      sourceId: string
+      name: string
+      message: string
+      stale: boolean
+    }>,
+  ) {
+    if (errors && errors.length > 0) {
+      const tooltip = errors
+        .map(
+          (e) =>
+            `${e.name}: ${e.message}${e.stale ? " (datos desactualizados)" : ""}`,
+        )
+        .join("\n")
+      warningLabel.set_tooltip_text(tooltip)
+      warningLabel.set_visible(true)
+    } else {
+      warningLabel.set_visible(false)
+    }
   }
 
   return {
@@ -371,6 +430,7 @@ for (let d = 0; d < CALENDAR.NUM_DAYS; d++) {
     renderEvents,
     showLoading,
     showError,
+    setWarning,
     updateNowLine,
   }
 }
@@ -386,9 +446,7 @@ function enrichEvents(grouped: any[]) {
       const endHour = end ? end.getHours() : startHour + 1
       const endMin = end ? end.getMinutes() : 0
 
-      const durationMin = end
-        ? end.getTime() - start.getTime()
-        : 60 * 60 * 1000
+      const durationMin = end ? end.getTime() - start.getTime() : 60 * 60 * 1000
       const duration = Math.max(
         1,
         Math.ceil((startMin + durationMin / 60000) / 60),
@@ -405,13 +463,19 @@ function enrichEvents(grouped: any[]) {
         duration,
         location: e.location,
         salon: extractSalon(e._rawDescription, e.location),
+        sourceId: e.sourceId || "",
+        sourceName: e.sourceName || "",
+        sourceOrder: e.sourceOrder ?? 0,
+        uid: e.uid || "",
       }
     })
   }
   return grouped
 }
 
-function createCalendarPopup(calendarUrl: string) {
+function createCalendarPopup(initialSources: Source[] = []) {
+  let sources: Source[] = initialSources
+
   const {
     mainBox,
     previousWeek,
@@ -421,9 +485,9 @@ function createCalendarPopup(calendarUrl: string) {
     renderEvents,
     showLoading,
     showError,
+    setWarning,
     updateNowLine,
-  } =
-    createCalendarGrid()
+  } = createCalendarGrid()
 
   const popover = new Gtk.Popover()
   popover.set_autohide(true)
@@ -434,12 +498,10 @@ function createCalendarPopup(calendarUrl: string) {
   popover.set_child(mainBox)
   popover.set_size_request(540, 600)
 
-  let lastFetch = 0
   let lastEnriched: any[] | null = null
 
   function navigateWeek(offset: number) {
     weekOffset.value += offset
-    lastFetch = 0
     lastEnriched = null
     show()
   }
@@ -453,23 +515,35 @@ function createCalendarPopup(calendarUrl: string) {
   })
 
   function refresh() {
-    const now = Date.now()
-    if (now - lastFetch < INTERVAL.CALENDAR) {
-      if (lastEnriched) renderEvents(lastEnriched)
+    if (!sources || sources.length === 0) {
+      showError("Configura calendars en src/config/privateConfig.js")
       return
     }
 
     const referenceDate = new Date()
     referenceDate.setDate(referenceDate.getDate() + weekOffset.value * 7)
-    fetchWeekEvents(calendarUrl, referenceDate)
-      .then((grouped) => {
-        const enriched = enrichEvents(grouped)
+
+    fetchWeekEvents(sources, referenceDate)
+      .then((result: any) => {
+        if (result.okCount === 0) {
+          const errorMsg =
+            result.errors && result.errors.length > 0
+              ? result.errors
+                  .map((e: any) => `${e.name}: ${e.message}`)
+                  .join("\n")
+              : "No se pudo cargar el calendario"
+          showError(errorMsg)
+          return
+        }
+
+        const enriched = enrichEvents(result.days)
         lastEnriched = enriched
-        renderEvents(enriched)
-        lastFetch = Date.now()
+        renderGrid()
+        renderEvents(enriched, sources)
+        setWarning(result.errors || [])
       })
-      .catch((e: Error) => {
-        showError(e instanceof Error ? e.message : "No se pudo cargar el calendario")
+      .catch(() => {
+        showError("No se pudo cargar el calendario")
       })
   }
 
@@ -483,10 +557,10 @@ function createCalendarPopup(calendarUrl: string) {
     popover.popdown()
   }
 
-  function setCalendarUrl(url: string) {
-    calendarUrl = url
-    lastFetch = 0
+  function setCalendarSources(newSources: Source[]) {
+    sources = newSources
     lastEnriched = null
+    clearCourseColorCache()
     if (popover.get_visible()) {
       showLoading()
       refresh()
@@ -505,7 +579,7 @@ function createCalendarPopup(calendarUrl: string) {
     clearCourseColorCache()
     if (popover.get_visible() && lastEnriched) {
       renderGrid()
-      renderEvents(lastEnriched)
+      renderEvents(lastEnriched, sources)
     }
   })
 
@@ -513,7 +587,7 @@ function createCalendarPopup(calendarUrl: string) {
     if (name !== "appConfig") return
     if (!popover.get_visible()) return
     renderGrid()
-    if (lastEnriched) renderEvents(lastEnriched)
+    if (lastEnriched) renderEvents(lastEnriched, sources)
   })
 
   function setAnchor(anchor: Gtk.Widget) {
@@ -524,19 +598,22 @@ function createCalendarPopup(calendarUrl: string) {
     overlayAnchor.add_overlay(popover)
   }
 
-  return { toggle, setCalendarUrl, setAnchor }
+  return { toggle, setCalendarSources, setAnchor }
 }
 
 let instance: ReturnType<typeof createCalendarPopup> | null = null
-let configuredCalendarUrl = ""
+let configuredCalendarSources: Source[] = []
 
-export function configureCalendarPopup(calendarUrl: string) {
-  configuredCalendarUrl = calendarUrl
-  instance?.setCalendarUrl(calendarUrl)
+export function configureCalendarPopup(sources: Source[]) {
+  configuredCalendarSources = sources
+  instance?.setCalendarSources(sources)
 }
 
-export function getCalendarPopup(calendarUrl?: string) {
-  if (!instance) instance = createCalendarPopup(calendarUrl ?? configuredCalendarUrl)
-  else if (calendarUrl !== undefined) instance.setCalendarUrl(calendarUrl)
+export function getCalendarPopup(sources?: Source[]) {
+  if (!instance) {
+    instance = createCalendarPopup(sources ?? configuredCalendarSources)
+  } else if (sources !== undefined) {
+    instance.setCalendarSources(sources)
+  }
   return instance
 }

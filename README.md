@@ -83,16 +83,35 @@ a su responsabilidad.
 3. `theme.css.js` aplica el CSS de AGS a partir de `theme.json`.
 
 La configuración privada del calendario se guarda en
-`src/config/privateConfig.js`, excluido del repositorio. AGS lo genera al
-iniciar si no existe. Edita la propiedad `calendarUrl` en ese archivo:
+`src/config/privateConfig.js`, excluido del repositorio en `.gitignore`.
+AGS lo genera al iniciar si no existe. Las URLs de calendario iCal son
+secretos personales y nunca deben compartirse ni incluirse en el control de
+versiones.
+
+El calendario soporta múltiples fuentes mediante el arreglo `calendars`:
 
 ```js
-export const privateConfig = {
-  calendarUrl: "https://calendar.google.com/calendar/ical/.../basic.ics",
+export let privateConfig = {
+  calendars: [
+    { name: "Universidad", url: "https://.../basic.ics", color: "blue" },
+    { name: "Personal", url: "https://.../basic.ics", color: "#FF8800" },
+  ],
 }
 ```
 
-Si la URL está vacía, el calendario simplemente no carga eventos.
+Cada fuente cuenta con las siguientes propiedades:
+
+- `name`: Nombre descriptivo de la fuente para identificar sus eventos y notificaciones.
+- `url`: Dirección iCal (`http`, `https` o `webcal`).
+- `color` (opcional): Nombre de un color del tema (`red`, `green`, `yellow`, `blue`, `magenta`, `cyan`, `red_s`, `green_s`, `yellow_s`, `blue_s`, `magenta_s`, `cyan_s`, `accent`) o un código hexadecimal (`#RRGGBB`). Si no se especifica, se asigna automáticamente por orden de aparición.
+
+Para mantener compatibilidad con versiones anteriores, si el archivo define
+`calendarUrl` (cadena no vacía) en lugar de `calendars`, se cargará como una
+fuente única. Si ambos están presentes, `calendars` tiene prioridad.
+
+Cualquier cambio guardado en `privateConfig.js` se recarga automáticamente sin
+necesidad de reiniciar AGS. Si no hay calendarios configurados o las URLs son
+inválidas, el calendario muestra el estado correspondiente.
 
 ## Limpieza pendiente
 

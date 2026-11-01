@@ -222,6 +222,7 @@ popover button:hover, popover button:checked { border-color: @accent; background
 .cal-event-time, .cal-event-title, .cal-event-salon { color: @fg; }
 .cal-week-nav { background: transparent; border: 0; color: @accent; font-size: 24px; min-width: 28px; min-height: 28px; }
 .cal-week-nav:hover { background-color: @bg-alt; }
+.cal-warning { color: @yellow; }
 
 /* Theme Selector Styles */
 .theme-selector-window {
