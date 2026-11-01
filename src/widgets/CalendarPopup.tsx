@@ -1,10 +1,14 @@
 import { Gtk } from "ags/gtk4"
 import GLib from "gi://GLib"
 import { CALENDAR, INTERVAL, LOCALE } from "../config/appConfig.js"
-import { fetchWeekEvents } from "../services/calendar/icalParser.js"
+import {
+  fetchWeekEvents,
+  pruneCalendarCache,
+} from "../services/calendar/icalParser.js"
 import { onConfigChange } from "../services/configWatcher.js"
 import {
   clearCalendarStyles,
+  flushCalendarStyles,
   getThemeColors,
   onThemeChange,
   registerCalendarStyle,
@@ -381,6 +385,7 @@ function createCalendarGrid() {
     if (weekOffset.value === 0) updateNowLine()
     else nowLine.set_visible(false)
     queueNowLineUpdate()
+    flushCalendarStyles()
   }
 
   function showLoading() {
@@ -581,8 +586,12 @@ function createCalendarPopup(initialSources: Source[] = []) {
     const referenceDate = new Date()
     referenceDate.setDate(referenceDate.getDate() + weekOffset.value * 7)
 
+    refreshId++
+    const myId = refreshId
+
     fetchWeekEvents(visibleSources, referenceDate)
       .then((result: any) => {
+        if (refreshId !== myId) return
         if (result.okCount === 0) {
           const errorMsg =
             result.errors && result.errors.length > 0
@@ -601,6 +610,7 @@ function createCalendarPopup(initialSources: Source[] = []) {
         setWarning(result.errors || [])
       })
       .catch(() => {
+        if (refreshId !== myId) return
         showError("No se pudo cargar el calendario")
       })
   }
@@ -618,6 +628,7 @@ function createCalendarPopup(initialSources: Source[] = []) {
   function setCalendarSources(newSources: Source[]) {
     sources = newSources
     lastEnriched = null
+    pruneCalendarCache(newSources)
     clearCourseColorCache()
     rebuildFilterList()
     if (popover.get_visible()) {
@@ -666,6 +677,7 @@ function createCalendarPopup(initialSources: Source[] = []) {
 
 let instance: ReturnType<typeof createCalendarPopup> | null = null
 let configuredCalendarSources: Source[] = []
+let refreshId = 0
 
 export function configureCalendarPopup(sources: Source[]) {
   configuredCalendarSources = sources

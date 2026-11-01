@@ -10,10 +10,25 @@ const DAY_MAP = { SU: 0, MO: 1, TU: 2, WE: 3, TH: 4, FR: 5, SA: 6 }
 
 const sourceCache = new Map()
 const inflightRequests = new Map()
+const failures = new Map()
 
 export function clearCalendarCache() {
   sourceCache.clear()
   inflightRequests.clear()
+  failures.clear()
+}
+
+export function pruneCalendarCache(sources) {
+  const activeIds = new Set(sources.map((s) => s.id))
+  for (const id of sourceCache.keys()) {
+    if (!activeIds.has(id)) sourceCache.delete(id)
+  }
+  for (const id of inflightRequests.keys()) {
+    if (!activeIds.has(id)) inflightRequests.delete(id)
+  }
+  for (const id of failures.keys()) {
+    if (!activeIds.has(id)) failures.delete(id)
+  }
 }
 
 function decodeICalString(str) {
@@ -414,21 +429,44 @@ function getOrFetchSource(source) {
     return inflightRequests.get(source.id)
   }
 
+  const failure = failures.get(source.id)
+  const cooldown = Math.min(
+    INTERVAL && typeof INTERVAL.CALENDAR === "number"
+      ? INTERVAL.CALENDAR
+      : 300000,
+    60000,
+  )
+  if (failure && now - failure.at < cooldown) {
+    if (cached) {
+      return Promise.resolve({
+        rawEvents: cached.rawEvents,
+        stale: true,
+        error: failure.error,
+      })
+    }
+    return Promise.reject(failure.error)
+  }
+
   const promise = loadSource(source)
     .then((rawEvents) => {
+      if (inflightRequests.get(source.id) !== promise)
+        return { rawEvents: [], stale: false, error: null }
       sourceCache.set(source.id, { rawEvents, fetchedAt: Date.now() })
       inflightRequests.delete(source.id)
+      failures.delete(source.id)
       return { rawEvents, stale: false, error: null }
     })
     .catch((err) => {
       inflightRequests.delete(source.id)
       if (cached) {
+        failures.set(source.id, { error: err, at: Date.now() })
         return {
           rawEvents: cached.rawEvents,
           stale: true,
           error: err,
         }
       }
+      failures.set(source.id, { error: err, at: Date.now() })
       throw err
     })
 
@@ -510,14 +548,6 @@ export async function fetchWeekEvents(
       errors: [],
       okCount: 0,
     }
-  }
-
-  const activeIds = new Set(sources.map((s) => s.id))
-  for (const id of sourceCache.keys()) {
-    if (!activeIds.has(id)) sourceCache.delete(id)
-  }
-  for (const id of inflightRequests.keys()) {
-    if (!activeIds.has(id)) inflightRequests.delete(id)
   }
 
   const settled = await Promise.allSettled(

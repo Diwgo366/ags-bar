@@ -331,6 +331,20 @@ export function registerCalendarStyle(cssClass, background) {
       )
     }
   }
+}
+
+export function flushCalendarStyles() {
+  if (!calendarStyleProvider) {
+    calendarStyleProvider = new Gtk.CssProvider()
+    const display = Gdk.Display.get_default()
+    if (display) {
+      Gtk.StyleContext.add_provider_for_display(
+        display,
+        calendarStyleProvider,
+        Gtk.STYLE_PROVIDER_PRIORITY_USER + 2,
+      )
+    }
+  }
   calendarStyleProvider.load_from_string(calendarStyles)
 }
 

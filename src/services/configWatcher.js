@@ -36,6 +36,68 @@ function readFile(name) {
   return new TextDecoder().decode(contents)
 }
 
+function stripComments(source) {
+  let out = ""
+  let inDouble = false
+  let inSingle = false
+  let inLine = false
+  let inBlock = false
+  let escaped = false
+
+  for (let i = 0; i < source.length; i++) {
+    const char = source[i]
+    const next = i + 1 < source.length ? source[i + 1] : ""
+
+    if (inLine) {
+      if (char === "\n") {
+        inLine = false
+        out += "\n"
+      }
+      continue
+    }
+
+    if (inBlock) {
+      if (char === "*" && next === "/") {
+        inBlock = false
+        i++
+      }
+      continue
+    }
+
+    if (inDouble) {
+      out += char
+      if (escaped) escaped = false
+      else if (char === "\\") escaped = true
+      else if (char === '"') inDouble = false
+      continue
+    }
+
+    if (inSingle) {
+      out += char
+      if (escaped) escaped = false
+      else if (char === "\\") escaped = true
+      else if (char === "'") inSingle = false
+      continue
+    }
+
+    if (char === "/" && next === "/") {
+      inLine = true
+      i++
+      continue
+    }
+    if (char === "/" && next === "*") {
+      inBlock = true
+      i++
+      continue
+    }
+    if (char === '"') inDouble = true
+    else if (char === "'") inSingle = true
+    out += char
+  }
+
+  return out
+}
+
 function findObjectLiteral(source, name) {
   const declaration = new RegExp(
     `export\\s+(?:const|let)\\s+${name}\\s*=\\s*\\{`,
@@ -63,36 +125,17 @@ function findObjectLiteral(source, name) {
   return null
 }
 
-function parseObjectLiteral(literal) {
-  let clean = ""
+function parseObjectLiteral(stripped) {
+  let json = ""
   let inDouble = false
   let inSingle = false
-  let inLineComment = false
-  let inBlockComment = false
   let escaped = false
 
-  for (let i = 0; i < literal.length; i++) {
-    const char = literal[i]
-    const next = i + 1 < literal.length ? literal[i + 1] : ""
-
-    if (inLineComment) {
-      if (char === "\n") {
-        inLineComment = false
-        clean += "\n"
-      }
-      continue
-    }
-
-    if (inBlockComment) {
-      if (char === "*" && next === "/") {
-        inBlockComment = false
-        i++
-      }
-      continue
-    }
+  for (let i = 0; i < stripped.length; i++) {
+    const char = stripped[i]
 
     if (inDouble) {
-      clean += char
+      json += char
       if (escaped) escaped = false
       else if (char === "\\") escaped = true
       else if (char === '"') inDouble = false
@@ -100,143 +143,65 @@ function parseObjectLiteral(literal) {
     }
 
     if (inSingle) {
-      clean += char
-      if (escaped) escaped = false
-      else if (char === "\\") escaped = true
-      else if (char === "'") inSingle = false
+      if (escaped) {
+        escaped = false
+        if (char === "'") json += "'"
+        else if (char === "\\") json += "\\\\"
+        else if (char === '"') json += '\\"'
+        else json += "\\" + char
+      } else if (char === "\\") {
+        escaped = true
+      } else if (char === "'") {
+        json += '"'
+        inSingle = false
+      } else if (char === '"') {
+        json += '\\"'
+      } else if (char === "\n") {
+        json += "\\n"
+      } else if (char === "\r") {
+        json += "\\r"
+      } else if (char === "\t") {
+        json += "\\t"
+      } else {
+        json += char
+      }
       continue
     }
 
-    if (char === "/" && next === "/") {
-      inLineComment = true
-      i++
-      continue
-    }
-    if (char === "/" && next === "*") {
-      inBlockComment = true
-      i++
-      continue
-    }
     if (char === '"') {
       inDouble = true
-      clean += char
+      json += char
       continue
     }
+
     if (char === "'") {
       inSingle = true
-      clean += char
-      continue
-    }
-    clean += char
-  }
-
-  let withDoubleStrings = ""
-  for (let i = 0; i < clean.length; i++) {
-    const char = clean[i]
-    if (char === '"') {
-      withDoubleStrings += '"'
-      i++
-      let esc = false
-      while (i < clean.length) {
-        const c = clean[i]
-        withDoubleStrings += c
-        if (esc) esc = false
-        else if (c === "\\") esc = true
-        else if (c === '"') break
-        i++
-      }
-      continue
-    }
-
-    if (char === "'") {
-      withDoubleStrings += '"'
-      i++
-      let esc = false
-      while (i < clean.length) {
-        const c = clean[i]
-        if (esc) {
-          if (c === "'") withDoubleStrings += "'"
-          else if (c === "\\") withDoubleStrings += "\\\\"
-          else if (c === '"') withDoubleStrings += '\\"'
-          else withDoubleStrings += "\\" + c
-          esc = false
-        } else if (c === "\\") {
-          esc = true
-        } else if (c === "'") {
-          withDoubleStrings += '"'
-          break
-        } else if (c === '"') {
-          withDoubleStrings += '\\"'
-        } else if (c === "\n") {
-          withDoubleStrings += "\\n"
-        } else if (c === "\r") {
-          withDoubleStrings += "\\r"
-        } else if (c === "\t") {
-          withDoubleStrings += "\\t"
-        } else {
-          withDoubleStrings += c
-        }
-        i++
-      }
-      continue
-    }
-
-    withDoubleStrings += char
-  }
-
-  let json = ""
-  for (let i = 0; i < withDoubleStrings.length; i++) {
-    const char = withDoubleStrings[i]
-
-    if (char === '"') {
       json += '"'
-      i++
-      let esc = false
-      while (i < withDoubleStrings.length) {
-        const c = withDoubleStrings[i]
-        json += c
-        if (esc) esc = false
-        else if (c === "\\") esc = true
-        else if (c === '"') break
-        i++
-      }
       continue
     }
 
     if (/[a-zA-Z_$]/.test(char)) {
       let id = char
       let j = i + 1
-      while (
-        j < withDoubleStrings.length &&
-        /[a-zA-Z0-9_$]/.test(withDoubleStrings[j])
-      ) {
-        id += withDoubleStrings[j]
+      while (j < stripped.length && /[a-zA-Z0-9_$]/.test(stripped[j])) {
+        id += stripped[j]
         j++
       }
       let k = j
-      while (k < withDoubleStrings.length && /\s/.test(withDoubleStrings[k])) {
-        k++
-      }
-      if (k < withDoubleStrings.length && withDoubleStrings[k] === ":") {
+      while (k < stripped.length && /\s/.test(stripped[k])) k++
+      if (k < stripped.length && stripped[k] === ":") {
         json += '"' + id + '"'
-        i = j - 1
-        continue
       } else {
         json += id
-        i = j - 1
-        continue
       }
+      i = j - 1
+      continue
     }
 
     if (char === ",") {
       let k = i + 1
-      while (k < withDoubleStrings.length && /\s/.test(withDoubleStrings[k])) {
-        k++
-      }
-      if (
-        k < withDoubleStrings.length &&
-        (withDoubleStrings[k] === "}" || withDoubleStrings[k] === "]")
-      ) {
+      while (k < stripped.length && /\s/.test(stripped[k])) k++
+      if (k < stripped.length && (stripped[k] === "}" || stripped[k] === "]")) {
         continue
       }
     }
@@ -248,7 +213,7 @@ function parseObjectLiteral(literal) {
 }
 
 function reloadAppConfig() {
-  const source = readFile("appConfig.js")
+  const source = stripComments(readFile("appConfig.js"))
   const updated = {}
 
   for (const name of [
@@ -292,7 +257,7 @@ function reloadAppConfig() {
 async function reloadPrivateConfig() {
   let parsed
   try {
-    const source = readFile("privateConfig.js")
+    const source = stripComments(readFile("privateConfig.js"))
     const literal = findObjectLiteral(source, "privateConfig")
     if (!literal) {
       console.error("No se pudo interpretar privateConfig.js")
