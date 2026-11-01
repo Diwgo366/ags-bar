@@ -93,8 +93,8 @@ El calendario soporta múltiples fuentes mediante el arreglo `calendars`:
 ```js
 export let privateConfig = {
   calendars: [
-    { name: "Universidad", url: "https://.../basic.ics", color: "blue" },
-    { name: "Personal", url: "https://.../basic.ics", color: "#FF8800" },
+    { name: "Universidad", url: "https://.../basic.ics" },
+    { name: "Personal", url: "https://.../basic.ics" },
   ],
 }
 ```
@@ -103,7 +103,11 @@ Cada fuente cuenta con las siguientes propiedades:
 
 - `name`: Nombre descriptivo de la fuente para identificar sus eventos y notificaciones.
 - `url`: Dirección iCal (`http`, `https` o `webcal`).
-- `color` (opcional): Nombre de un color del tema (`red`, `green`, `yellow`, `blue`, `magenta`, `cyan`, `red_s`, `green_s`, `yellow_s`, `blue_s`, `magenta_s`, `cyan_s`, `accent`) o un código hexadecimal (`#RRGGBB`). Si no se especifica, se asigna automáticamente por orden de aparición.
+
+Los colores de los eventos se asignan automáticamente siguiendo una regla determinista:
+mismo calendario + mismo nombre de evento = mismo color siempre (a lo largo de todas las
+semanas y tras cambios de tema). Nombres distintos dentro de un mismo calendario reciben
+colores distintos de la paleta del tema activo.
 
 Para mantener compatibilidad con versiones anteriores, si el archivo define
 `calendarUrl` (cadena no vacía) en lugar de `calendars`, se cargará como una

@@ -14,7 +14,6 @@ export type Source = {
   id: string
   name: string
   url: string
-  color: string | null
   order: number
 }
 
@@ -29,6 +28,7 @@ function hashString(str: string) {
 
 const courseColorCache: Record<string, { bg: string; cssClass: string }> = {}
 const registeredCourses = new Set<string>()
+const colorSlots = new Map<string, number>()
 
 function clearCourseColorCache() {
   for (const name of Object.keys(courseColorCache)) {
@@ -53,31 +53,20 @@ const themeColorNames = [
   "cyan_s",
 ] as const
 
-function getCourseColors(summary: string, source?: Source | null) {
-  const sourceId = source?.id ?? ""
+function getCourseColors(summary: string, sourceId = "") {
   const key = `${sourceId}|${summary.trim()}`
   if (courseColorCache[key]) return courseColorCache[key]
 
+  if (!colorSlots.has(key)) {
+    colorSlots.set(key, colorSlots.size)
+  }
+  const slot = colorSlots.get(key)!
+
   const colors = getThemeColors()
-  let bg: string | null = null
-
-  if (source?.color) {
-    if (/^#[0-9a-fA-F]{6}$/.test(source.color)) {
-      bg = source.color
-    } else if (colors && colors[source.color]) {
-      bg = colors[source.color]
-    }
-  }
-
-  if (!bg) {
-    const colorName =
-      themeColorNames[
-        Object.keys(courseColorCache).length % themeColorNames.length
-      ]
-    bg = colors[colorName]
-  }
-
+  const colorName = themeColorNames[slot % themeColorNames.length]
+  const bg = colors[colorName]
   const cssClass = `cal-course-${hashString(key)}`
+
   courseColorCache[key] = { bg, cssClass }
   return courseColorCache[key]
 }
@@ -313,8 +302,7 @@ function createCalendarGrid() {
         const event = eventsByHour[d]?.get(hour)
 
         if (event) {
-          const source = currentSources.find((s) => s.id === event.sourceId)
-          const colors = getCourseColors(event.summary, source)
+          const colors = getCourseColors(event.summary, event.sourceId)
           const colorKey = `${event.sourceId || ""}|${event.summary.trim()}`
           registerCourseStyle(colorKey, colors)
           const span = Math.min(event.duration || 1, hours - h)

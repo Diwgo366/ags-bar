@@ -46,23 +46,10 @@ export function normalizeCalendarSources(config) {
       const order = result.length
       const name = rawName || `Calendario ${order + 1}`
 
-      let color = null
-      if (typeof entry.color === "string") {
-        const trimmedColor = entry.color.trim()
-        if (trimmedColor.startsWith("#")) {
-          if (/^#[0-9a-fA-F]{6}$/.test(trimmedColor)) {
-            color = trimmedColor
-          }
-        } else if (trimmedColor.length > 0) {
-          color = trimmedColor
-        }
-      }
-
       result.push({
         id,
         name,
         url,
-        color,
         order,
       })
     }
