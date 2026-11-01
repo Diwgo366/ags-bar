@@ -150,12 +150,14 @@ function createCalendarGrid() {
   })
   headerBox.append(titleLabel)
 
-  const warningLabel = new Gtk.Label({
-    label: "⚠",
+  const warningImage = new Gtk.Image({
+    icon_name: "dialog-warning-symbolic",
+    pixel_size: 18,
+    valign: Gtk.Align.CENTER,
     css_classes: ["cal-warning"],
     visible: false,
   })
-  headerBox.append(warningLabel)
+  headerBox.append(warningImage)
 
   const nextWeek = new Gtk.Button({
     label: "›",
@@ -414,10 +416,10 @@ function createCalendarGrid() {
             `${e.name}: ${e.message}${e.stale ? " (datos desactualizados)" : ""}`,
         )
         .join("\n")
-      warningLabel.set_tooltip_text(tooltip)
-      warningLabel.set_visible(true)
+      warningImage.set_tooltip_text(tooltip)
+      warningImage.set_visible(true)
     } else {
-      warningLabel.set_visible(false)
+      warningImage.set_visible(false)
     }
   }
 

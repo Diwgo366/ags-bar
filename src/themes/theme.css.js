@@ -222,7 +222,7 @@ popover button:hover, popover button:checked { border-color: @accent; background
 .cal-event-time, .cal-event-title, .cal-event-salon { color: @fg; }
 .cal-week-nav { background: transparent; border: 0; color: @accent; font-size: 24px; min-width: 28px; min-height: 28px; }
 .cal-week-nav:hover { background-color: @bg-alt; }
-.cal-warning { color: @yellow; }
+.cal-warning { color: @yellow; -gtk-icon-style: symbolic; min-width: 22px; min-height: 22px; margin: 0 6px; }
 
 /* Theme Selector Styles */
 .theme-selector-window {
@@ -310,9 +310,9 @@ function watchThemeFile() {
 }
 
 export function registerCalendarStyle(cssClass, background) {
-  // The event also has .cal-cell, whose base background is defined by the
-  // main provider. Match that selector and add the course class so this rule
-  // wins without raising the dynamic provider above the app's base CSS.
+  // Los cursos usan prioridad USER + 2 para ganar siempre al proveedor
+  // principal (USER + 1) y al tema GTK del sistema (USER), evitando que
+  // applyTheme() pise los fondos de los eventos tras cambios de tema.
   calendarStyles += `.cal-cell.${cssClass} { background-color: alpha(${background}, 0.85); }\n`
 
   if (!calendarStyleProvider) {
@@ -322,7 +322,7 @@ export function registerCalendarStyle(cssClass, background) {
       Gtk.StyleContext.add_provider_for_display(
         display,
         calendarStyleProvider,
-        Gtk.STYLE_PROVIDER_PRIORITY_USER + 1,
+        Gtk.STYLE_PROVIDER_PRIORITY_USER + 2,
       )
     }
   }
