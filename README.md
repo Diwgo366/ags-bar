@@ -117,6 +117,12 @@ Cualquier cambio guardado en `privateConfig.js` se recarga automáticamente sin
 necesidad de reiniciar AGS. Si no hay calendarios configurados o las URLs son
 inválidas, el calendario muestra el estado correspondiente.
 
+Cuando hay 2 o más calendarios configurados, la cabecera del calendario muestra
+un botón de filtro que permite activar o desactivar la visualización de cada fuente.
+Ocultar un calendario no descarta sus datos en caché y actualiza la vista de
+inmediato. Si se desmarcan todos los calendarios, se muestra el mensaje
+"Ningún calendario seleccionado".
+
 ## Limpieza pendiente
 
 La ruta externa ya está verificada y usa `src/app.ts`.

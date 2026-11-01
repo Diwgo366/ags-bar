@@ -148,6 +148,22 @@ function createCalendarGrid() {
   })
   headerBox.append(warningImage)
 
+  const filterPopover = new Gtk.Popover()
+  const filterBox = new Gtk.Box({
+    orientation: Gtk.Orientation.VERTICAL,
+    spacing: 4,
+  })
+  filterPopover.set_child(filterBox)
+
+  const filterButton = new Gtk.MenuButton({
+    icon_name: "view-list-symbolic",
+    css_classes: ["cal-filter"],
+    popover: filterPopover,
+    valign: Gtk.Align.CENTER,
+    visible: false,
+  })
+  headerBox.append(filterButton)
+
   const nextWeek = new Gtk.Button({
     label: "›",
     css_classes: ["cal-week-nav"],
@@ -389,6 +405,17 @@ function createCalendarGrid() {
     grid.attach(error, 0, 0, CALENDAR.NUM_DAYS + 1, 1)
   }
 
+  function showMessage(msg: string) {
+    setWarning([])
+    clearChildren(grid)
+    const label = new Gtk.Label({
+      label: String(msg || ""),
+      margin_top: 20,
+      margin_bottom: 20,
+    })
+    grid.attach(label, 0, 0, CALENDAR.NUM_DAYS + 1, 1)
+  }
+
   function setWarning(
     errors: Array<{
       sourceId: string
@@ -415,11 +442,14 @@ function createCalendarGrid() {
     mainBox,
     previousWeek,
     nextWeek,
+    filterButton,
+    filterBox,
     weekOffset,
     renderGrid,
     renderEvents,
     showLoading,
     showError,
+    showMessage,
     setWarning,
     updateNowLine,
   }
@@ -470,11 +500,14 @@ function createCalendarPopup(initialSources: Source[] = []) {
     mainBox,
     previousWeek,
     nextWeek,
+    filterButton,
+    filterBox,
     weekOffset,
     renderGrid,
     renderEvents,
     showLoading,
     showError,
+    showMessage,
     setWarning,
     updateNowLine,
   } = createCalendarGrid()
@@ -488,7 +521,36 @@ function createCalendarPopup(initialSources: Source[] = []) {
   popover.set_child(mainBox)
   popover.set_size_request(540, 600)
 
+  const hiddenSourceIds = new Set<string>()
   let lastEnriched: any[] | null = null
+
+  function rebuildFilterList() {
+    filterButton.set_visible(sources.length >= 2)
+
+    const currentIds = new Set(sources.map((s) => s.id))
+    for (const id of hiddenSourceIds) {
+      if (!currentIds.has(id)) hiddenSourceIds.delete(id)
+    }
+
+    clearChildren(filterBox)
+    for (const source of sources) {
+      const check = new Gtk.CheckButton({
+        label: source.name,
+        active: !hiddenSourceIds.has(source.id),
+      })
+      check.connect("toggled", () => {
+        if (check.get_active()) {
+          hiddenSourceIds.delete(source.id)
+        } else {
+          hiddenSourceIds.add(source.id)
+        }
+        refresh()
+      })
+      filterBox.append(check)
+    }
+  }
+
+  rebuildFilterList()
 
   function navigateWeek(offset: number) {
     weekOffset.value += offset
@@ -510,10 +572,16 @@ function createCalendarPopup(initialSources: Source[] = []) {
       return
     }
 
+    const visibleSources = sources.filter((s) => !hiddenSourceIds.has(s.id))
+    if (visibleSources.length === 0) {
+      showMessage("Ningún calendario seleccionado")
+      return
+    }
+
     const referenceDate = new Date()
     referenceDate.setDate(referenceDate.getDate() + weekOffset.value * 7)
 
-    fetchWeekEvents(sources, referenceDate)
+    fetchWeekEvents(visibleSources, referenceDate)
       .then((result: any) => {
         if (result.okCount === 0) {
           const errorMsg =
@@ -529,7 +597,7 @@ function createCalendarPopup(initialSources: Source[] = []) {
         const enriched = enrichEvents(result.days)
         lastEnriched = enriched
         renderGrid()
-        renderEvents(enriched, sources)
+        renderEvents(enriched, visibleSources)
         setWarning(result.errors || [])
       })
       .catch(() => {
@@ -551,6 +619,7 @@ function createCalendarPopup(initialSources: Source[] = []) {
     sources = newSources
     lastEnriched = null
     clearCourseColorCache()
+    rebuildFilterList()
     if (popover.get_visible()) {
       showLoading()
       refresh()
@@ -569,7 +638,8 @@ function createCalendarPopup(initialSources: Source[] = []) {
     clearCourseColorCache()
     if (popover.get_visible() && lastEnriched) {
       renderGrid()
-      renderEvents(lastEnriched, sources)
+      const visibleSources = sources.filter((s) => !hiddenSourceIds.has(s.id))
+      renderEvents(lastEnriched, visibleSources)
     }
   })
 
@@ -577,7 +647,10 @@ function createCalendarPopup(initialSources: Source[] = []) {
     if (name !== "appConfig") return
     if (!popover.get_visible()) return
     renderGrid()
-    if (lastEnriched) renderEvents(lastEnriched, sources)
+    if (lastEnriched) {
+      const visibleSources = sources.filter((s) => !hiddenSourceIds.has(s.id))
+      renderEvents(lastEnriched, visibleSources)
+    }
   })
 
   function setAnchor(anchor: Gtk.Widget) {

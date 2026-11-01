@@ -77,7 +77,7 @@ function generateCSS() {
  * salen de theme.json. Añade aquí cualquier widget nuevo antes de darle estilo.
  */
 window, label, box, centerbox, overlay, image, button, menubutton,
-togglebutton, popover, tooltip {
+togglebutton, popover, tooltip, checkbutton, check {
   font-family: "${t.font.family ?? "Arial"}";
   font-size: ${t.font.size ?? 13}px;
   background-color: transparent;
@@ -223,6 +223,11 @@ popover button:hover, popover button:checked { border-color: @accent; background
 .cal-week-nav { background: transparent; border: 0; color: @accent; font-size: 24px; min-width: 28px; min-height: 28px; }
 .cal-week-nav:hover { background-color: @bg-alt; }
 .cal-warning { color: @yellow; -gtk-icon-style: symbolic; min-width: 22px; min-height: 22px; margin: 0 6px; }
+.cal-filter button { background: transparent; border: 0; color: @accent; min-width: 28px; min-height: 28px; padding: 0; margin: 0; }
+.cal-filter button:hover, .cal-filter button:checked { background-color: @bg-alt; border-color: transparent; color: @accent; }
+checkbutton { padding: 4px 8px; color: @fg; }
+checkbutton check { border: 1px solid @bd; border-radius: 4px; min-width: 16px; min-height: 16px; margin-right: 8px; margin-end: 8px; background-color: transparent; }
+checkbutton check:checked { background-color: @accent; border-color: @accent; color: @bg; }
 
 /* Theme Selector Styles */
 .theme-selector-window {
